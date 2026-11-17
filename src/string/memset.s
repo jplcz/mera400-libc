@@ -18,7 +18,7 @@
 ; last. dest is raised again before returning. The loop needs no scratch
 ; register and no masking of c, because rb ignores the high octet of r2.
 
-	.text
+	.section .text.memset,"ax"
 	.globl memset
 memset:
 	cwt r3, 0

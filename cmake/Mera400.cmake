@@ -27,6 +27,30 @@
 # section first, and this function additionally gives crt0.o first on the
 # command line, so the layout is right even for a hand-written link command.
 
+#   MERA400_MODEL (small or large) must be set before the functions are used.
+#   Large adds -mlarge-memory to every C compilation and the large-model
+#   linker defaults (stack and console at the top of the 128 KiB space).
+#   Archives are written to <build>/lib/<model>/.
+
+if(NOT MERA400_MODEL)
+  set(MERA400_MODEL small)
+endif()
+set(MERA400_LIB_DIR "${CMAKE_BINARY_DIR}/lib/${MERA400_MODEL}")
+set(MERA400_CLANG_MODEL_FLAGS)
+set(MERA400_ASM_MODEL_FLAGS)
+set(MERA400_LINK_DEFSYMS)
+if(MERA400_MODEL STREQUAL "large")
+  set(MERA400_CLANG_MODEL_FLAGS -mlarge-memory)
+  # Assembly sources that differ in the large model (function pointers are
+  # 32-bit byte addresses there, see src/stdlib/exit.s) test this symbol.
+  set(MERA400_ASM_MODEL_FLAGS --defsym=MERA400_LARGE=1)
+  # Byte addresses. A word address must fit in 16 bits, so the highest
+  # usable word is 0xFFFF (byte 0x1FFFE): the console port is that word and
+  # the stack starts just below it (the first push goes to word 0xFFFE).
+  set(MERA400_LINK_DEFSYMS --defsym=__stack_top=0x1FFFE
+                           --defsym=__console_port=0x1FFFE)
+endif()
+
 set(MERA400_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." CACHE INTERNAL "")
 set(MERA400_LINKER_SCRIPT "${MERA400_ROOT}/crt/mera400.ld" CACHE INTERNAL "")
 
@@ -52,6 +76,7 @@ function(_mera400_object out_var source target)
       OUTPUT "${_obj}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir"
       COMMAND "${MERA400_LLVM_MC}" -triple=mera400-unknown-none
+              ${MERA400_ASM_MODEL_FLAGS}
               -filetype=obj "${_abs}" -o "${_obj}"
       DEPENDS "${_abs}"
       COMMENT "Assembling ${source}"
@@ -63,8 +88,16 @@ function(_mera400_object out_var source target)
     add_custom_command(
       OUTPUT "${_obj}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir"
+      # -nostdlibinc drops the system include directories but keeps Clang's
+      # own headers (stddef.h, stdarg.h, stdbool.h), which are correct for the
+      # target; the library only adds its own freestanding headers.
+      # Every function and every data object gets its own section, so that
+      # the linker's --gc-sections (see mera400_add_executable) can drop what
+      # a program does not use: code size matters on a machine with 64K words.
       COMMAND "${MERA400_CLANG}" --target=mera400-unknown-none -ffreestanding
-              -nostdinc -O2 -I "${MERA400_ROOT}/include" -c "${_abs}" -o "${_obj}"
+              -nostdlibinc -O2 -ffunction-sections -fdata-sections
+              ${MERA400_CLANG_MODEL_FLAGS}
+              -isystem "${MERA400_ROOT}/include" -c "${_abs}" -o "${_obj}"
       DEPENDS "${_abs}"
       COMMENT "Compiling ${source}"
       VERBATIM)
@@ -82,9 +115,12 @@ function(mera400_add_library name)
     _mera400_object(_obj "${_src}" "${name}")
     list(APPEND _objs "${_obj}")
   endforeach()
-  set(_lib "${CMAKE_CURRENT_BINARY_DIR}/lib${name}.a")
+  # One directory per memory model (lib/small, lib/large), so archives of
+  # different models can never be mixed up.
+  set(_lib "${MERA400_LIB_DIR}/lib${name}.a")
   add_custom_command(
     OUTPUT "${_lib}"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "${MERA400_LIB_DIR}"
     COMMAND "${CMAKE_COMMAND}" -E remove -f "${_lib}"
     COMMAND "${MERA400_LLVM_AR}" rcs "${_lib}" ${_objs}
     DEPENDS ${_objs}
@@ -114,7 +150,8 @@ function(mera400_add_executable name)
   add_custom_command(
     OUTPUT "${_elf}"
     COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-            ${ARG_LINK_OPTIONS} "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>"
+            --gc-sections
+            ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS} "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>"
             ${_objs} ${_libs} -o "${_elf}"
     DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"
     COMMENT "Linking ${name}.elf"
@@ -125,7 +162,7 @@ function(mera400_add_executable name)
     add_custom_command(
       OUTPUT "${_bin}"
       COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-              --oformat=binary ${ARG_LINK_OPTIONS}
+              --gc-sections --oformat=binary ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
               "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>" ${_objs} ${_libs}
               -o "${_bin}"
       DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"

@@ -18,7 +18,7 @@
 ; preserves it. The absolute value of -32768 is 32768 when read as unsigned,
 ; which is what the unsigned division wants. Division by zero is undefined.
 
-	.text
+	.section .text.__divhi3,"ax"
 	.globl __divhi3
 __divhi3:
 	awt r7, -2

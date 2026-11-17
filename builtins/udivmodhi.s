@@ -29,7 +29,7 @@
 ; overflow) and a 1 goes into the freed low bit of r1, which becomes the
 ; quotient as the dividend bits leave.
 
-	.text
+	.section .text.__udivmodhi,"ax"
 	.globl __udivmodhi
 __udivmodhi:
 	cwt r2, 0

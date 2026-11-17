@@ -11,16 +11,20 @@
 ;      grows downward from it),
 ;   2. clears the .bss section (__bss_start .. __bss_end, supplied by the
 ;      linker script; a flat binary does not contain .bss),
-;   3. calls main(0, 0) (argc = 0, argv = 0),
-;   4. halts with r1 = main's return value ("exit status") when main returns.
+;   3. runs the initialisers (__libc_init_array: .preinit_array, then
+;      .init_array; C++ static constructors live there),
+;   4. calls main(0, 0) (argc = 0, argv = 0),
+;   5. calls exit(main's return value), which runs the atexit handlers and
+;      the .fini_array (C++ static destructors) and then _Exit.
 ;
 ; "lw rX, symbol" loads the word address of a symbol: the linker converts
 ; the symbol's byte address into words, so r7 and the .bss bounds are word
 ; addresses, which is what rw and r7-relative addressing use.
 ;
-; exit and abort are here because they are only a halt on this machine.
+; _Exit and abort are here because on bare metal they are only a halt.
 ; hlt 077 is the conventional "finished" stop code of MERA-400 test
-; programs and hlt 040 is used for abort.
+; programs and hlt 040 is used for abort. exit and atexit are in the library
+; (src/stdlib/exit.s) and are shared with the other platforms.
 
 ; Everything here lives in its own section, .text.crt0. The linker script
 ; places that section first in the image, so _start is the very first word
@@ -41,16 +45,24 @@ _start:
 	awt r1, 1
 	ujs .clear
 .cleared:
+	rj r4, __libc_init_array
 	lwt r1, 0		; argc
 	lwt r2, 0		; argv
 	rj r4, main
-	; main's result stays in r1 and is the exit status
+	rj r4, exit		; r1 = main's result = exit status
+	; exit does not return
 
-	.globl exit
-exit:
-	hlt 077
-	ujs exit		; resuming the CPU must not run into other code
+; _Exit and abort get their own sections so that --gc-sections can drop them
+; (a program that only calls exit still keeps _Exit, which exit references).
+	.section .text._Exit,"ax"
+	.globl _Exit
+	.globl _exit
+_Exit:
+_exit:
+	hlt 077			; r1 = status
+	ujs _Exit		; resuming the CPU must not run into other code
 
+	.section .text.abort,"ax"
 	.globl abort
 abort:
 	hlt 040

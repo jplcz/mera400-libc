@@ -14,7 +14,7 @@
 ; A tail jump to __udivmodhi, which returns the quotient in r1 (and the
 ; remainder in r2, ignored here) straight to our caller through r4.
 
-	.text
+	.section .text.__udivhi3,"ax"
 	.globl __udivhi3
 __udivhi3:
 	uj __udivmodhi

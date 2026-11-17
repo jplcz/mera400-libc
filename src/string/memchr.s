@@ -21,7 +21,7 @@
 ; match; irb counts r3 up to zero. On a match r1+r3 is the address of the
 ; byte.
 
-	.text
+	.section .text.memchr,"ax"
 	.globl memchr
 memchr:
 	cwt r3, 0

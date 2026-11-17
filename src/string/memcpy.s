@@ -27,7 +27,7 @@
 ;
 ; Copying is forward, which also makes memmove with dest < src correct.
 
-	.text
+	.section .text.memcpy,"ax"
 	.globl memcpy
 memcpy:
 	cwt r3, 0

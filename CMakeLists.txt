@@ -23,16 +23,20 @@ if(NOT CMAKE_TOOLCHAIN_FILE)
 endif()
 
 # --- Memory model -----------------------------------------------------------
-set(MERA400_MEMORY_MODEL "small" CACHE STRING
-    "Memory model: small (16-bit byte pointers) or large (32-bit, not implemented)")
-set_property(CACHE MERA400_MEMORY_MODEL PROPERTY STRINGS small large)
-if(MERA400_MEMORY_MODEL STREQUAL "large")
-  message(FATAL_ERROR
-    "MERA400_MEMORY_MODEL=large is not implemented yet: the library only "
-    "supports the small model (16-bit byte pointers). Use "
-    "-DMERA400_MEMORY_MODEL=small.")
-elseif(NOT MERA400_MEMORY_MODEL STREQUAL "small")
-  message(FATAL_ERROR "MERA400_MEMORY_MODEL must be small or large")
+set(MERA400_MODEL "small" CACHE STRING
+    "Memory model: small (16-bit byte pointers) or large (32-bit byte pointers)")
+set_property(CACHE MERA400_MODEL PROPERTY STRINGS small large)
+if(NOT MERA400_MODEL MATCHES "^(small|large)$")
+  message(FATAL_ERROR "MERA400_MODEL must be small or large")
+endif()
+
+# --- Platform ---------------------------------------------------------------
+# none:  bare metal, the program runs on the bare processor (crt/crt0.s).
+# crook: runs under CROOK, the MERA-400 operating system (see README.md).
+set(MERA400_PLATFORM "none" CACHE STRING "Target platform: none or crook")
+set_property(CACHE MERA400_PLATFORM PROPERTY STRINGS none crook)
+if(NOT MERA400_PLATFORM MATCHES "^(none|crook)$")
+  message(FATAL_ERROR "MERA400_PLATFORM must be none or crook")
 endif()
 
 # --- C compiler (optional) --------------------------------------------------
@@ -96,8 +100,38 @@ if(MERA400_C_ENABLED)
        src/ctype/*.c src/stdlib/*.c src/string/*.c)
 endif()
 
-mera400_add_library(c SOURCES ${MERA400_STRING_SOURCES} ${MERA400_C_SOURCES})
-mera400_add_library(builtins SOURCES ${MERA400_BUILTINS_SOURCES})
+set(MERA400_BUILTINS_C_SOURCES)
+if(MERA400_C_ENABLED)
+  # 32-bit helpers are written in C (they use only one-place shifts and
+  # 32-bit additions, which the compiler expands inline).
+  set(MERA400_BUILTINS_C_SOURCES
+    builtins/ashlsi3.c builtins/lshrsi3.c builtins/ashrsi3.c
+    builtins/mulsi3.c builtins/udivmodsi4.c builtins/di3.c
+    builtins/m48_addsub.c builtins/m48_mul.c builtins/m48_div.c
+    builtins/m48_misc.c builtins/m48_conv.c builtins/m48_powi.c)
+endif()
+
+mera400_add_library(c SOURCES ${MERA400_STRING_SOURCES} src/stdlib/exit.s
+                    ${MERA400_C_SOURCES})
+mera400_add_library(builtins SOURCES ${MERA400_BUILTINS_SOURCES}
+                    ${MERA400_BUILTINS_C_SOURCES})
+
+# The platform layer is a separate library (libcrook.a) plus its own start-up
+# object, so the bare-metal libc and its tests are the same on every platform.
+if(MERA400_PLATFORM STREQUAL "crook")
+  include(crook)
+endif()
+
+# --- Install: a sysroot for "clang --target=mera400-unknown-none --sysroot" ---
+# Clang's MERA-400 driver looks for <sysroot>/include, <sysroot>/lib/crt0.o,
+# <sysroot>/lib/mera400.ld, libc.a and libbuiltins.a, so installing into a
+# directory with this layout is all a user needs to compile and link programs
+# with the plain compiler command.
+install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+install(FILES "${_crt0_obj}" crt/mera400.ld DESTINATION lib)
+get_target_property(_libc_a c MERA400_ARCHIVE)
+get_target_property(_builtins_a builtins MERA400_ARCHIVE)
+install(FILES "${_libc_a}" "${_builtins_a}" DESTINATION lib)
 
 # --- Tests ------------------------------------------------------------------
 include(CTest)
@@ -105,6 +139,9 @@ if(BUILD_TESTING)
   find_package(Python3 COMPONENTS Interpreter)
   if(Python3_Interpreter_FOUND)
     add_subdirectory(tests)
+    if(MERA400_PLATFORM STREQUAL "crook")
+      add_subdirectory(tests/crook)
+    endif()
   else()
     message(WARNING "Python 3 not found: the simulator tests are disabled")
   endif()

@@ -18,7 +18,7 @@
 ; Algorithm: divide the absolute values with __udivmodhi, take the remainder
 ; it leaves in r2 and negate it when a was negative (r5 remembers a).
 
-	.text
+	.section .text.__modhi3,"ax"
 	.globl __modhi3
 __modhi3:
 	awt r7, -2

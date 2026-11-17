@@ -16,8 +16,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from m400sim import Cpu, Elf, Halted  # noqa: E402
 
-STACK_TOP = 0x1000      # word address: the stack grows down from here
-STACK_ROOM = 16         # words below STACK_TOP a function may use
+STACK_TOP = 0x7000      # word address: the stack grows down from here
+STACK_ROOM = 64         # words below STACK_TOP a function may use
 RET_WORD = 0x0010       # word holding "hlt 077": the caller's return address
 HLT_77 = 0xEC3F
 DATA_LO = 0x2200        # byte addresses from here up are free for test data
@@ -80,42 +80,49 @@ class Machine:
         self.image = image
         self.cpu = Cpu(LoggedMem(image.base))
 
-    # Byte access (byte address = word * 2 + octet, octet 0 = high).
+    # Byte access (byte address = word * 2 + octet, octet 0 = high). In the
+    # large model a byte address has 17 bits (see large-memory tests).
     def put(self, addr, data):
         for i, b in enumerate(data):
             self.put_byte(addr + i, b)
 
     def put_byte(self, addr, b):
         mem = self.cpu.mem
-        w = (addr >> 1) & 0x7FFF
+        w = (addr >> 1) & 0xFFFF
         v = mem[w]
         mem[w] = ((b << 8) | (v & 0xFF)) if not addr & 1 else ((v & 0xFF00) | b)
 
     def byte(self, addr, mem=None):
         mem = mem if mem is not None else self.cpu.mem
-        w = mem[(addr >> 1) & 0x7FFF]
+        w = mem[(addr >> 1) & 0xFFFF]
         return (w & 0xFF) if addr & 1 else (w >> 8)
 
     def get(self, addr, n):
         return bytes(self.byte(addr + i) for i in range(n))
 
-    def call(self, symbol, *args, expect_writes=None, what=None, checker=None):
+    def call(self, symbol, *args, stack=(), expect_writes=None, what=None,
+             checker=None):
         """Call symbol(args...) and verify the effects.
 
-        expect_writes maps byte address -> value for every byte the function
-        is allowed (and required) to change; any other change outside the
-        stack room is a failure. Returns r1.
+        args go to r1, r2, r3; stack lists the words the callee finds at
+        0(r7), 1(r7), ... on entry (further arguments). expect_writes maps
+        byte address -> value for every byte the function is allowed (and
+        required) to change; any other change outside the stack room is a
+        failure. Returns r1.
         """
         cpu = self.cpu
         init = list(cpu.mem)
         cpu.mem.written.clear()
         cpu.steps = 0
         cpu.skip = False
+        sp = STACK_TOP - len(stack)
         for i, a in enumerate(args):
             cpu.r[1 + i] = a & 0xFFFF
+        for i, a in enumerate(stack):
+            cpu.mem[sp + i] = a & 0xFFFF
         cpu.r[4] = RET_WORD
         cpu.r[5], cpu.r[6] = SENTINEL[5], SENTINEL[6]
-        cpu.r[7] = STACK_TOP
+        cpu.r[7] = sp
         cpu.ic = self.image.word(symbol)
         problems = []
         try:
@@ -130,7 +137,7 @@ class Machine:
         for reg, name in ((5, "r5"), (6, "r6")):
             if cpu.r[reg] != SENTINEL[reg]:
                 problems.append("%s not preserved" % name)
-        if cpu.r[7] != STACK_TOP:
+        if cpu.r[7] != sp:
             problems.append("r7 not restored: %#x" % cpu.r[7])
         if expect_writes is not None:
             problems += self._memory_diff(init, expect_writes)
@@ -147,7 +154,7 @@ class Machine:
                 continue
             touched.add(2 * w)
             touched.add(2 * w + 1)
-        touched.update(a & 0xFFFF for a in expect)
+        touched.update(a & 0x1FFFF for a in expect)
         for addr in sorted(touched):
             old = self.byte(addr, init)
             want = expect.get(addr, old)

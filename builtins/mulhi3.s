@@ -20,7 +20,7 @@
 ; added; a doubles each round (slz). The loop runs for as many rounds as b
 ; has significant bits.
 
-	.text
+	.section .text.__mulhi3,"ax"
 	.globl __mulhi3
 __mulhi3:
 	lwt r3, 0

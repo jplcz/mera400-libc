@@ -21,7 +21,7 @@
 ; Algorithm: one "slz" (shift left, insert zero) per count, n times; drb
 ; (decrement and branch if not zero) is the loop counter.
 
-	.text
+	.section .text.__ashlhi3,"ax"
 	.globl __ashlhi3
 __ashlhi3:
 	cl r2, 16

@@ -19,7 +19,7 @@
 ; so r2+r6 is where the byte at r2 goes. The copy stops at the source
 ; terminator or after n bytes; the terminator is stored in both cases.
 
-	.text
+	.section .text.strncat,"ax"
 	.globl strncat
 strncat:
 	awt r7, -2

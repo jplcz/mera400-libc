@@ -15,7 +15,7 @@
 ; Calls __udivmodhi (which leaves the remainder in r2), so the return
 ; address in r4 is saved on the stack around the call.
 
-	.text
+	.section .text.__umodhi3,"ax"
 	.globl __umodhi3
 __umodhi3:
 	awt r7, -1

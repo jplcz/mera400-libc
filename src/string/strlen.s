@@ -19,7 +19,7 @@
 ; add would otherwise sit between the compare and the jump and the loop
 ; would depend on the add leaving the compare flags alone.
 
-	.text
+	.section .text.strlen,"ax"
 	.globl strlen
 strlen:
 	lw r2, r1		; r2 = s

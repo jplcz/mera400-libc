@@ -24,7 +24,12 @@
 ENTRY(_start)
 
 PROVIDE(__image_base = 0x400);
-PROVIDE(__stack_top = 0x10000);
+/* The small model default: the stack starts at the top word of the 32K-word
+   region that byte pointers reach (the first push goes to word 0x7FFE). The
+   top word itself, byte address 0xFFFE, is the simulator console port (see
+   src/stdio/README.md). The large model passes 0x1FFFE for both. */
+PROVIDE(__stack_top = 0xFFFE);
+PROVIDE(__console_port = 0xFFFE);
 PROVIDE(__stack_size = 0x400);
 
 SECTIONS
@@ -38,6 +43,32 @@ SECTIONS
     *(.text .text.*)
   }
   .rodata : { *(.rodata .rodata.*) }
+
+  /* Arrays of function (word) addresses that crt0 and exit() run: the
+     pre-initialisers and initialisers (C++ static constructors, functions
+     marked __attribute__((constructor))) in order before main, the
+     finalisers in reverse order after it. The bounds are BYTE addresses;
+     one entry is 2 bytes in the small model (a word address) and 4 bytes in
+     the large one (a 32-bit byte address), see src/stdlib/exit.s. */
+  .preinit_array : {
+    . = ALIGN(2);
+    __preinit_array_start = .;
+    KEEP(*(.preinit_array))
+    __preinit_array_end = .;
+  }
+  .init_array : {
+    . = ALIGN(2);
+    __init_array_start = .;
+    KEEP(*(SORT_BY_INIT_PRIORITY(.init_array.*) .init_array))
+    __init_array_end = .;
+  }
+  .fini_array : {
+    . = ALIGN(2);
+    __fini_array_start = .;
+    KEEP(*(SORT_BY_INIT_PRIORITY(.fini_array.*) .fini_array))
+    __fini_array_end = .;
+  }
+
   .data : { *(.data .data.*) }
 
   /* Word aligned bounds: crt0 clears .bss with word stores. */

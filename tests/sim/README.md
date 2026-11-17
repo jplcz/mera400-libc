@@ -11,6 +11,15 @@ compares, all jumps, `rj`/`lj`, skips (`bb bm bs bc bn`), `irb`/`drb`, shifts,
 `NotModelled`): I/O, interrupts, memory blocks, the AWP floating unit, `ls`,
 `ri`, `pw`.
 
+**Extracodes (EXL).** By default `EXL` raises `NotModelled`. To test code
+that calls an operating system (CROOK), set `cpu.exl_handler` to a Python
+function `handler(cpu, number)`. The simulator calls it instead of trapping;
+the handler reads and writes registers and memory (for CROOK the argument is
+in R4) and may set the carry flag, so a fake operating system fits in a few
+lines. See `../crook/test_crook.py`. A bug in decoding byte instructions
+(wrong bits used, failing for EXL numbers of 128 and above) was fixed
+together with this hook.
+
 Semantics were taken from the source of the EM400 emulator; they are
 believed right but are unproven against hardware.
 

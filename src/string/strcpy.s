@@ -17,7 +17,7 @@
 ; compared with zero), advances i and repeats while the copied byte was not
 ; the terminator. dest is never moved, so it is already the result.
 
-	.text
+	.section .text.strcpy,"ax"
 	.globl strcpy
 strcpy:
 	awt r7, -1

@@ -18,17 +18,29 @@ mera400_add_executable(crt_test SOURCES crt/main_ret.s
 function(_add_test_image name lib entry)
   set(_elf "${CMAKE_CURRENT_BINARY_DIR}/${name}.elf")
   get_target_property(_a ${lib} MERA400_ARCHIVE)
+  # The C parts of libc call the compiler helpers and abort (in crt0), so
+  # those are linked as ordinary (not whole) archive members.
+  set(_more)
+  set(_more_deps)
+  # crt0 (which provides abort) refers to main; the image has none because
+  # the tests call functions directly, so main is aliased to the entry.
+  if(ARGN)
+    get_target_property(_b builtins MERA400_ARCHIVE)
+    set(_more --no-whole-archive --defsym=main=${entry}
+        "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>" "${_b}")
+    set(_more_deps builtins crt0 "${_b}")
+  endif()
   add_custom_command(
     OUTPUT "${_elf}"
     COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-            --whole-archive "${_a}" -e ${entry} -o "${_elf}"
-    DEPENDS ${lib} "${_a}" "${MERA400_LINKER_SCRIPT}"
+            --whole-archive "${_a}" ${_more} -e ${entry} -o "${_elf}"
+    DEPENDS ${lib} ${_more_deps} "${_a}" "${MERA400_LINKER_SCRIPT}"
     COMMENT "Linking ${name}.elf"
     VERBATIM)
   add_custom_target(${name} ALL DEPENDS "${_elf}")
 endfunction()
 
-_add_test_image(string_image c memcpy)
+_add_test_image(string_image c memcpy WITH_RUNTIME)
 _add_test_image(builtins_image builtins __mulhi3)
 
 set(_py ${Python3_EXECUTABLE})
@@ -36,6 +48,12 @@ set(_py ${Python3_EXECUTABLE})
 add_test(NAME string COMMAND ${_py} ${SIM}/test_string.py string_image.elf)
 add_test(NAME builtins COMMAND ${_py} ${SIM}/test_builtins.py builtins_image.elf)
 add_test(NAME crt0 COMMAND ${_py} ${SIM}/test_crt.py crt_test.elf crt_test.bin)
+if(MERA400_C_ENABLED)
+  mera400_add_executable(c_test SOURCES c/test_c.c LIBRARIES c builtins)
+  add_test(NAME c-on-target COMMAND ${_py} ${SIM}/test_c.py c_test.elf)
+  set_tests_properties(c-on-target PROPERTIES WORKING_DIRECTORY
+                       "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
 add_test(NAME decoder-vs-objdump
          COMMAND ${_py} ${SIM}/test_decode.py "${MERA400_LLVM_OBJDUMP}"
                  string_image.elf builtins_image.elf crt_test.elf)
@@ -48,8 +66,8 @@ add_test(NAME start-first
                  "${CMAKE_CURRENT_BINARY_DIR}/crt_test.dir/main_ret.o"
                  "${CMAKE_CURRENT_BINARY_DIR}/../c.dir/strlen.o"
                  "${CMAKE_CURRENT_BINARY_DIR}/../builtins.dir/mulhi3.o"
-                 "${CMAKE_CURRENT_BINARY_DIR}/../libc.a"
-                 "${CMAKE_CURRENT_BINARY_DIR}/../libbuiltins.a")
+                 "${MERA400_LIB_DIR}/libc.a"
+                 "${MERA400_LIB_DIR}/libbuiltins.a")
 set_tests_properties(string builtins crt0 decoder-vs-objdump start-first
                      PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
@@ -62,7 +80,7 @@ if(MERA400_HOST_CC AND NOT CMAKE_HOST_WIN32)
   add_custom_command(
     OUTPUT host_c_test
     COMMAND "${MERA400_HOST_CC}" -std=gnu99 -O1 -ffreestanding -fno-builtin
-            -nostdinc -no-pie -I "${_root}/include"
+            -no-pie -I "${_root}/include"
             "${CMAKE_CURRENT_SOURCE_DIR}/host/test_c.c"
             "${_root}/src/ctype/ctype.c" "${_root}/src/stdlib/misc.c"
             "${_root}/src/stdlib/strtol.c" "${_root}/src/stdlib/qsort.c"

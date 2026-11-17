@@ -18,7 +18,7 @@
 ; when the equal bytes are zero the strings ended together and the result
 ; is 0, even if fewer than n bytes were compared.
 
-	.text
+	.section .text.strncmp,"ax"
 	.globl strncmp
 strncmp:
 	cwt r3, 0

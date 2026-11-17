@@ -21,7 +21,7 @@
 ; When the terminator has been copied, r6 is zero, so the padding loop can
 ; store r6 for the remaining r3-1 bytes.
 
-	.text
+	.section .text.strncpy,"ax"
 	.globl strncpy
 strncpy:
 	cwt r3, 0

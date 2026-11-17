@@ -18,7 +18,7 @@
 ; inserting the X flag, and "sxu" sets X from the sign bit. X is not changed
 ; by srx, so n times srx replicates the sign. n is clamped to 16 first.
 
-	.text
+	.section .text.__ashrhi3,"ax"
 	.globl __ashrhi3
 __ashrhi3:
 	cl r2, 16

@@ -17,7 +17,7 @@
 ; the distance from src to that position, so r2+r3 is the destination of
 ; the byte at r2 and a single moving pointer (r2) drives the copy.
 
-	.text
+	.section .text.strcat,"ax"
 	.globl strcat
 strcat:
 	awt r7, -1

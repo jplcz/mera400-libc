@@ -81,7 +81,9 @@ def decode(ir):
     if op == 0o70:
         return SHORT_JUMP[a], "short"
     if op == 0o71:
-        return BYTE_OPS[a], "byte"
+        # BLC, EXL, BRC, NRF: bits 9-8 select the instruction, the low byte
+        # is its argument (llvm-mc: EXL n = 0xE500 + n).
+        return BYTE_OPS[(ir >> 8) & 3], "byte"
     if op == 0o72:
         if b == 2:
             return "shc", "none"
@@ -114,6 +116,9 @@ class Cpu:
         self.skip = False
         self.steps = 0
         self.executed = set()
+        # Called as exl_handler(cpu, number) for every EXL; a fake operating
+        # system. The CPU continues after the EXL when it returns.
+        self.exl_handler = None
 
     # --- flags -----------------------------------------------------------
     def fset(self, f, on=True):
@@ -188,7 +193,9 @@ class Cpu:
                 self.ic = (self.ic + 1) & MASK
             return
 
-        if name in ("?", "ou", "in", "ri", "ls", "pw") or op in (0o37, 0o71, 0o75, 0o76, 0o77):
+        if name in ("?", "ou", "in", "ri", "ls", "pw") or (
+                op in (0o37, 0o71, 0o75, 0o76, 0o77)
+                and not (name == "exl" and self.exl_handler)):
             raise NotModelled(name)
 
         if kind == "norm":
@@ -328,6 +335,8 @@ class Cpu:
             self.wr(a, ((v >> t) | (v << (16 - t))) & MASK)
         elif name == "ric":
             raise NotModelled(name)
+        elif name == "exl":
+            self.exl_handler(self, ir & 0xFF)
         else:
             raise NotModelled(name)
 

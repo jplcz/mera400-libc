@@ -23,7 +23,7 @@
 ; is clear. Only after a mismatch are the pointers needed again, so the
 ; mismatching byte of s2 can then be loaded into r1.
 
-	.text
+	.section .text.memcmp,"ax"
 	.globl memcmp
 memcmp:
 	cwt r3, 0

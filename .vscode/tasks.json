@@ -30,12 +30,48 @@
       "problemMatcher": []
     },
     {
+      "label": "install",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--install", "${workspaceFolder}/build", "--prefix", "${workspaceFolder}/build/sysroot"],
+      "dependsOn": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "test",
       "type": "shell",
       "command": "ctest",
       "args": ["--test-dir", "${workspaceFolder}/build", "--output-on-failure"],
       "group": { "kind": "test", "isDefault": true },
       "dependsOn": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "configure (CROOK)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S", "${workspaceFolder}",
+        "-B", "${workspaceFolder}/build-crook",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/mera400-toolchain.cmake",
+        "-DMERA400_PLATFORM=crook",
+        "-DLLVM_BIN_DIR=${input:llvmBinDir}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build (CROOK)",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build-crook"],
+      "problemMatcher": []
+    },
+    {
+      "label": "test (CROOK)",
+      "type": "shell",
+      "command": "ctest",
+      "args": ["--test-dir", "${workspaceFolder}/build-crook", "--output-on-failure"],
+      "dependsOn": "build (CROOK)",
       "problemMatcher": []
     }
   ]

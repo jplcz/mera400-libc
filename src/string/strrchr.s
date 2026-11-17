@@ -21,7 +21,7 @@
 ; test. The match test precedes the terminator test, so for c == 0 the
 ; terminator itself is recorded.
 
-	.text
+	.section .text.strrchr,"ax"
 	.globl strrchr
 strrchr:
 	awt r7, -1

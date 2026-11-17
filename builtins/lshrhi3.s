@@ -16,7 +16,7 @@
 ;
 ; Algorithm: n times "srz" (shift right, insert zero), counted by drb.
 
-	.text
+	.section .text.__lshrhi3,"ax"
 	.globl __lshrhi3
 __lshrhi3:
 	cl r2, 16

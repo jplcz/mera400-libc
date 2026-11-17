@@ -20,7 +20,7 @@
 ; zero end the loop with result 0. On a mismatch the byte of s2 is loaded
 ; into r1 and subtracted.
 
-	.text
+	.section .text.strcmp,"ax"
 	.globl strcmp
 strcmp:
 	awt r7, -1

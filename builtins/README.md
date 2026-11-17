@@ -18,7 +18,9 @@ Edge cases are noted at the top of each file.
 | `__mulhi3` | multiplication | done |
 | `__udivhi3` / `__umodhi3` | unsigned divide / remainder | done |
 | `__divhi3` / `__modhi3` | signed divide / remainder (toward zero) | done |
-| `__ashlsi3` ... `__modsi3` (32-bit) | | not started |
+| `__ashlsi3` `__lshrsi3` `__ashrsi3` | 32-bit shifts by a variable count (the count is a 32-bit value, as the compiler passes it) | done, in C |
+| `__mulsi3` | 32-bit multiplication | done, in C |
+| `__udivsi3` `__umodsi3` `__divsi3` `__modsi3` | 32-bit divide / remainder | done, in C |
 | `*di3` (64-bit) | | not started |
 
 `udivmodhi.s` holds the shared internal routine `__udivmodhi` (quotient in

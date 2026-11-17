@@ -23,7 +23,7 @@
 ; offset 0; r1 is raised again before returning. The pointer comparison is
 ; unsigned (cl), because byte addresses use the whole 16-bit range.
 
-	.text
+	.section .text.memmove,"ax"
 	.globl memmove
 memmove:
 	cl r1, r2

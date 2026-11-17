@@ -21,7 +21,7 @@
 ; sets E), then the terminator (cb r3, r1 sets L while the byte is not
 ; zero). The match test comes first so that c == 0 finds the terminator.
 
-	.text
+	.section .text.strchr,"ax"
 	.globl strchr
 strchr:
 	lwt r3, 0
