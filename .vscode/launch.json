@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Simulator: string tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/sim/test_string.py",
+      "args": ["${workspaceFolder}/build/tests/string_image.elf"],
+      "cwd": "${workspaceFolder}/tests/sim",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Simulator: builtins tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/sim/test_builtins.py",
+      "args": ["${workspaceFolder}/build/tests/builtins_image.elf"],
+      "cwd": "${workspaceFolder}/tests/sim",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Simulator: crt0 test",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/tests/sim/test_crt.py",
+      "args": [
+        "${workspaceFolder}/build/tests/crt_test.elf",
+        "${workspaceFolder}/build/tests/crt_test.bin"
+      ],
+      "cwd": "${workspaceFolder}/tests/sim",
+      "console": "integratedTerminal"
+    }
+  ]
+}

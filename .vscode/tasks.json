@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "llvmBinDir",
+      "type": "promptString",
+      "description": "Directory with the MERA-400 enabled llvm-mc, ld.lld, llvm-ar, llvm-objdump (empty: use PATH)",
+      "default": ""
+    }
+  ],
+  "tasks": [
+    {
+      "label": "configure",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S", "${workspaceFolder}",
+        "-B", "${workspaceFolder}/build",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/mera400-toolchain.cmake",
+        "-DLLVM_BIN_DIR=${input:llvmBinDir}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "ctest",
+      "args": ["--test-dir", "${workspaceFolder}/build", "--output-on-failure"],
+      "group": { "kind": "test", "isDefault": true },
+      "dependsOn": "build",
+      "problemMatcher": []
+    }
+  ]
+}
