@@ -33,6 +33,15 @@ from m400sim import Cpu, Elf, Halted, FC  # noqa: E402
 
 END, ASG, DATE, CORE, WAIT, INPR, PRIR, PRIN = 0o373, 0o200, 0o252, 0o232, 0o247, 0o212, 0o213, 0o215
 CROOK5_ONLY = {0o270: "GMEM", 0o271: "RMEM", 0o272: "LRAM"}
+# Calls with a FIL block, a BLOCK block (word 0 gets the error/result word =
+# the extracode number) and no argument (R4 must be 0).
+FIL_CALLS = {0o201: "CASG", 0o202: "SETP", 0o203: "LOAP", 0o205: "NASG", 0o233: "CPRF"}
+BLOCK_CALLS = {0o204: "TMEM", 0o222: "WADR", 0o223: "OVL", 0o224: "REAP",
+               0o225: "WRIP", 0o226: "READ", 0o227: "WRIT"}
+NOARG_CALLS = {0o210: "ERAS", 0o251: "RELD"}
+ENDS = {0o375: "ABO", 0o376: "KILL", 0o377: "EOSL"}
+# What the program does once, chosen through its "probe" cell.
+PROBES = {1: 0o270, 2: 0o271, 3: 0o272, 4: 0o375, 5: 0o376, 6: 0o377}
 version = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 rejected = []                          # CROOK-5 only extracodes called on CROOK 4
 
@@ -66,10 +75,11 @@ def text_at(mem, baddr):
     return bytes(out)
 
 
-def run(store_terminator):
+def run(store_terminator, probe=0):
     rng = random.Random(400)
     mem = [rng.randrange(0x10000) for _ in range(0x10000)]   # junk everywhere
     elf.load(mem)
+    mem[W("probe")] = probe
     cpu = Cpu(mem)
     cpu.ic = sym["__image_base"] // 2
     log = []
@@ -98,17 +108,33 @@ def run(store_terminator):
             log.append(("WAIT", r4))
             cpu.r[4] = 0x1234
             cpu.fset(FC)
+        elif n == 0o250:
+            log.append(("STOP", r4))
+            cpu.r[4] = 0x4321
         elif n == DATE:
             log.append(("DATE", r4))
             mem[r4:r4 + 3] = [2026, 11, 17]
         elif n == ASG:
             log.append(("ASG", r4))
             mem[r4] = 0x55
+        elif n in FIL_CALLS or n in BLOCK_CALLS:
+            log.append((FIL_CALLS.get(n) or BLOCK_CALLS[n], r4))
+            mem[r4] = n
+        elif n in NOARG_CALLS:
+            log.append((NOARG_CALLS[n], r4))
+        elif n == 0o374:
+            log.append(("BACK", r4))        # the program goes on
         elif n == CORE:
             log.append(("CORE", r4))
             cpu.r[4] = 0x2FFF
         elif n in CROOK5_ONLY and version == 4:
             rejected.append(CROOK5_ONLY[n])
+            raise Halted(n)
+        elif n in CROOK5_ONLY:
+            log.append((CROOK5_ONLY[n], r4))
+            cpu.r[4] = (r4 + 1) & 0xFFFF
+        elif n in ENDS:
+            log.append((ENDS[n], r4))
             raise Halted(n)
         elif n == END:
             log.append(("END", r4))
@@ -139,6 +165,7 @@ for store_terminator in (True, False):
     def rec(kind, text):
         return (kind, 4, text, 0, 0x0DFF)
 
+    fb, bb = W("fil_block"), W("blk_block")
     want = [
         rec("PRIR", b"hello"), rec("PRIR", b"world"),
         rec("PRIN", s[:254]), rec("PRIR", s[254:]),
@@ -148,6 +175,9 @@ for store_terminator in (True, False):
         ("INPR", 3, 0x0DFF, 0),
         ("WAIT", 5), ("WAIT", 5), ("DATE", W("date_buf")),
         ("ASG", W("fil_block")), ("CORE", 0), ("INPR", 9, 0x0DFF, 0),
+        ("SETP", fb), ("LOAP", fb), ("CPRF", fb), ("ERAS", 0), ("RELD", 0),
+        ("TMEM", bb), ("OVL", bb), ("REAP", bb), ("WRIP", bb), ("WADR", bb),
+        ("READ", bb), ("WRIT", bb), ("STOP", 3), ("BACK", 0),
         ("END", 7),
     ]
     # INPR for stream 9 reads rec_block, which the program never filled: the
@@ -169,6 +199,31 @@ for store_terminator in (True, False):
     ck.check(mem[W("res_inpr")] == 1, tag + "__crook_inpr returns the C flag")
     ck.check(cpu.r[7] == sym["__stack_top"] // 2, tag + "stack balanced: r7=%#x" % cpu.r[7])
     ck.check(cpu.r[4] == 7, tag + "END argument r4 = %d, want 7" % cpu.r[4])
+    rn = W("res_new")
+    for i, (name, n) in enumerate([("SETP", 0o202), ("LOAP", 0o203), ("CPRF", 0o233),
+                                   ("TMEM", 0o204), ("OVL", 0o223), ("REAP", 0o224),
+                                   ("WRIP", 0o225), ("WADR", 0o222), ("READ", 0o226),
+                                   ("WRIT", 0o227), ("STOP", 0x4321)]):
+        ck.check(mem[rn + i] == n, tag + "%s result %#o, want %#o" % (name, mem[rn + i], n))
+
+# One-off calls chosen by the program's "probe" cell: the CROOK-5 memory calls
+# (rejected by the fake CROOK 4) and the calls that end the program.
+for probe, n in PROBES.items():
+    tag = "[probe %#o] " % n
+    cpu, mem, log, code = run(True, probe)
+    if n in CROOK5_ONLY and version == 4:
+        ck.check(code == n and rejected and rejected[-1] == CROOK5_ONLY[n],
+                 tag + "CROOK 4 did not reject %s" % CROOK5_ONLY[n])
+        del rejected[:]
+        continue
+    if n in CROOK5_ONLY:
+        arg = W("blk_block") if n == 0o272 else 0x0F00
+        ck.check(log[-2] == (CROOK5_ONLY[n], arg), tag + "call %r" % (log[-2],))
+        ck.check(mem[W("res_new") + 11] == arg + 1, tag + "result is r4 after the call")
+        ck.check(code == END, tag + "program did not end with END")
+    else:
+        arg = {0o375: 5, 0o376: 6, 0o377: 8}[n]
+        ck.check(log[-1] == (ENDS[n], arg) and code == n, tag + "end call %r" % (log[-1],))
 
 # The raw image: big-endian words from the base address on, whole image size.
 with open(sys.argv[2], "rb") as f:

@@ -284,10 +284,10 @@ CROOK-4 has none of them: a process owns one contiguous block that **CORE**
 *How.* Choose the version when you configure, with the CMake option
 `MERA400_CROOK_VERSION` (`4` or `5`, default `5`), and when you build by hand
 with Clang's `-mcrook-version=4` or `-mcrook-version=5`. Clang then defines the
-macro `__CROOK_VERSION__` (4 or 5), and `<crook.h>` declares `__crook_gmem`
-and `__crook_rmem` only for version 5. Calling one in a CROOK-4 build is a
-compile error, so the mistake shows up on your computer and not as an alarm
-on the CROOK machine. (LRAM has no wrapper in this library.) The program image
+macro `__CROOK_VERSION__` (4 or 5), and `<crook.h>` declares `__crook_gmem`,
+`__crook_rmem` and `__crook_lram` only for version 5. Calling one in a CROOK-4
+build is a compile error, so the mistake shows up on your computer and not as
+an alarm on the CROOK machine. The program image
 is the same for both versions; there is one library, not two.
 
 ```sh
@@ -302,7 +302,7 @@ it with CORE is not done.
 *Tests.* In a CROOK-4 configuration the fake CROOK of `tests/crook` has no
 GMEM, RMEM or LRAM: if the program calls one the test fails. The test
 `crook-version-guard` compiles `tests/crook/crook_guard.c` to check that
-`<crook.h>` declares GMEM and RMEM exactly for version 5. A CROOK-4 image
+`<crook.h>` declares GMEM, RMEM and LRAM exactly for version 5. A CROOK-4 image
 cannot be run on a real system here: no CROOK-4 disk image and no emulator
 support for it are known, so CROOK-4 is tested against the fake CROOK only.
 

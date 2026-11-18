@@ -15,6 +15,16 @@
 ;                                        asks. Returns the current map.
 ; unsigned __crook_rmem(unsigned map);   RMEM 0271  release the blocks in map.
 ;                                        Returns the current map.
+; unsigned __crook_lram(unsigned *tab); LRAM 0272  CROOK-5 only: fetch the
+;                                        information on a RAM file into the
+;                                        table at word address "tab". The
+;                                        table layout is not documented.
+;                                        Returns r4 after the call.
+; void __crook_stop(unsigned ticks);     STOP 0250  stop the process until the
+;                                        parent runs it again (RUNP) or a
+;                                        child raises an alarm; a non-zero
+;                                        "ticks" also ends the wait after that
+;                                        many ticks. Returns nothing useful.
 ; void __crook_wait(unsigned ticks);     WAIT 0247  sleep; a tick is 100 ms.
 ; void __crook_date(unsigned *d);        DATE 0252  stores year, month, day in
 ;                                        d[0..2].
@@ -23,7 +33,7 @@
 ;
 ; The argument goes to CROOK in r4 (for DATE and TIME it is the word address of
 ; the 3-word result). Every function returns the value r4 holds after the call;
-; for WAIT, DATE and TIME that value is meaningless.
+; for WAIT, STOP, DATE and TIME that value is meaningless.
 ; (CORE does not work for non-contiguous processes, GMEM/RMEM numbering of
 ; blocks is as in the process memory map.)
 ;
@@ -48,6 +58,8 @@
 	VALUE_CALL __crook_core, 0232
 	VALUE_CALL __crook_gmem, 0270
 	VALUE_CALL __crook_rmem, 0271
+	VALUE_CALL __crook_lram, 0272
+	VALUE_CALL __crook_stop, 0250
 	VALUE_CALL __crook_wait, 0247
 	VALUE_CALL __crook_date, 0252
 	VALUE_CALL __crook_time, 0253

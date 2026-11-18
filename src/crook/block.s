@@ -12,6 +12,20 @@
 ; unsigned __crook_tmem(unsigned *blk);   TMEM 0204  attach a 4 K-word block
 ;                                                    of a RAM file (resident
 ;                                                    processes only)
+; unsigned __crook_ovl(unsigned *blk);   OVL  0223  load an overlay from the
+;                                                    process' own file
+; unsigned __crook_reap(unsigned *blk);  REAP 0224  read the special (swap)
+;                                                    file of a process
+; unsigned __crook_wrip(unsigned *blk);  WRIP 0225  write the special file of
+;                                                    a process
+; unsigned __crook_wadr(unsigned *blk);  WADR 0222  write address fields
+;                                                    (privileged programs only)
+;
+; The four new calls take the same BLOCK as READ and WRIT. For REAP and WRIP
+; word 1 is the process id instead of the stream id, and for OVL word 1 is
+; ignored. The sector in word 4 counts from the start of the file; what
+; selects the module for OVL (a 4-character module name for relocatable
+; modules) is not documented, so it is not described here.
 ;
 ; "blk" is a word pointer to the parameter block. For READ and WRIT the
 ; verified layout is: word 0 = count of words transferred (set by CROOK),
@@ -46,3 +60,7 @@
 	BLOCK_CALL __crook_read, 0226
 	BLOCK_CALL __crook_writ, 0227
 	BLOCK_CALL __crook_tmem, 0204
+	BLOCK_CALL __crook_wadr, 0222
+	BLOCK_CALL __crook_ovl, 0223
+	BLOCK_CALL __crook_reap, 0224
+	BLOCK_CALL __crook_wrip, 0225

@@ -16,7 +16,7 @@ add_test(NAME crook
 set_tests_properties(crook PROPERTIES
                      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
-# GMEM and RMEM are declared by <crook.h> for CROOK 5 only.
+# GMEM, RMEM and LRAM are declared by <crook.h> for CROOK 5 only.
 if(MERA400_C_ENABLED)
   add_test(NAME crook-version-guard
            COMMAND ${MERA400_CLANG} --target=${MERA400_TRIPLE} -ffreestanding

@@ -15,11 +15,27 @@ unsigned __crook_exl(unsigned number, unsigned r4, unsigned *carry);
 void exit(int status);
 void _exit(int status);
 void abort(void);
+/* Program end under XOSL (none returns, except BACK): EOSL prints "FINISH",
+ * ABO deletes the program, KILL deletes it and prints "DELETED". BACK lets
+ * XOSL continue while this program runs on in the background. */
+void __crook_exit_finish(int status);
+void __crook_abo(int status);
+void __crook_kill(int status);
+void __crook_back(void);
 
-/* File assignment: return word 0 of the FIL block (error word). */
+/* File assignment and parameters: return word 0 of the FIL block (error
+ * word). SETP sets and LOAP loads the file parameters, CPRF creates the
+ * special file for loading a process into its own block. */
 unsigned __crook_asg(unsigned fil);
 unsigned __crook_casg(unsigned fil);
 unsigned __crook_nasg(unsigned fil);
+unsigned __crook_setp(unsigned fil);
+unsigned __crook_loap(unsigned fil);
+unsigned __crook_cprf(unsigned fil);
+/* No argument: remove all local streams (ERAS), release the character
+ * devices (RELD). */
+void __crook_eras(void);
+void __crook_reld(void);
 
 /* Record I/O: return the carry flag (1 = end of file). */
 unsigned __crook_inpr(unsigned rec);
@@ -27,23 +43,30 @@ unsigned __crook_prir(unsigned rec);
 unsigned __crook_pinp(unsigned rec);
 unsigned __crook_prin(unsigned rec);
 
-/* Block I/O and memory blocks: return word 0 of the BLOCK block. */
+/* Block I/O and memory blocks: return word 0 of the BLOCK block. OVL loads an
+ * overlay, REAP/WRIP read/write the special file of a process, WADR is
+ * privileged. */
 unsigned __crook_read(unsigned blk);
 unsigned __crook_writ(unsigned blk);
 unsigned __crook_tmem(unsigned blk);
+unsigned __crook_ovl(unsigned blk);
+unsigned __crook_reap(unsigned blk);
+unsigned __crook_wrip(unsigned blk);
+unsigned __crook_wadr(unsigned blk);
 
-/* Values returned in R4. GMEM and RMEM exist in CROOK-5 only (CROOK-4 has no
- * non-contiguous memory map), so they are declared only when the program is
- * built for CROOK 5 or later: __CROOK_VERSION__ is 4 or 5, set by Clang's
- * -mcrook-version=. A call in a CROOK-4 build is a compile error instead of
- * an alarm on the real system. LRAM (0272, also CROOK-5 only) has no wrapper;
- * reach it with __crook_exl. */
+/* Values returned in R4. GMEM, RMEM and LRAM exist in CROOK-5 only (CROOK-4
+ * has no non-contiguous memory map), so they are declared only when the
+ * program is built for CROOK 5 or later: __CROOK_VERSION__ is 4 or 5, set by
+ * Clang's -mcrook-version=. A call in a CROOK-4 build is a compile error
+ * instead of an alarm on the real system. */
 unsigned __crook_core(unsigned arg);
 #if !defined(__CROOK_VERSION__) || __CROOK_VERSION__ >= 5
 unsigned __crook_gmem(unsigned arg);
 unsigned __crook_rmem(unsigned arg);
+unsigned __crook_lram(unsigned tab);   /* tab: word address of the table */
 #endif
 unsigned __crook_wait(unsigned arg);
+unsigned __crook_stop(unsigned arg);
 unsigned __crook_date(unsigned arg);
 unsigned __crook_time(unsigned arg);
 

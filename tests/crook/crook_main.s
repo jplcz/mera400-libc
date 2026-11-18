@@ -62,6 +62,72 @@ main:
 	rj r4, __crook_inpr
 	rw r1, res_inpr
 
+	.macro CALL_FIL fn, idx
+	lw r1, fil_block
+	rj r4, \fn
+	rw r1, res_new+\idx
+	.endm
+	.macro CALL_BLK fn, idx
+	lw r1, blk_block
+	rj r4, \fn
+	rw r1, res_new+\idx
+	.endm
+
+	CALL_FIL __crook_setp, 0
+	CALL_FIL __crook_loap, 1
+	CALL_FIL __crook_cprf, 2
+	rj r4, __crook_eras
+	rj r4, __crook_reld
+	CALL_BLK __crook_tmem, 3
+	CALL_BLK __crook_ovl, 4
+	CALL_BLK __crook_reap, 5
+	CALL_BLK __crook_wrip, 6
+	CALL_BLK __crook_wadr, 7
+	CALL_BLK __crook_read, 8
+	CALL_BLK __crook_writ, 9
+	lw r1, 3
+	rj r4, __crook_stop
+	rw r1, res_new+10
+	rj r4, __crook_back
+
+	tw r2, probe		; which one-off call to make, 0 = none
+	cwt r2, 0
+	je .probe_done
+	cwt r2, 1
+	je .probe_gmem
+	cwt r2, 2
+	je .probe_rmem
+	cwt r2, 3
+	je .probe_lram
+	cwt r2, 4
+	je .probe_abo
+	cwt r2, 5
+	je .probe_kill
+	lwt r1, 8
+	rj r4, __crook_exit_finish
+.probe_gmem:
+	lw r1, 0x0F00
+	rj r4, __crook_gmem
+	rw r1, res_new+11
+	uj .probe_done
+.probe_rmem:
+	lw r1, 0x0F00
+	rj r4, __crook_rmem
+	rw r1, res_new+11
+	uj .probe_done
+.probe_lram:
+	lw r1, blk_block
+	rj r4, __crook_lram
+	rw r1, res_new+11
+	uj .probe_done
+.probe_abo:
+	lwt r1, 5
+	rj r4, __crook_abo
+.probe_kill:
+	lwt r1, 6
+	rj r4, __crook_kill
+.probe_done:
+
 	lwt r1, 7
 	tw r4, r7
 	awt r7, 1
@@ -76,6 +142,10 @@ long_msg:
 	.ascii "xx"
 	.endr
 	.asciiz "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+
+	.globl probe
+probe:
+	.short 0
 
 	.bss
 	.balign 2
@@ -105,4 +175,10 @@ fil_block:
 	.space 24
 	.globl rec_block
 rec_block:
+	.space 10
+	.globl res_new
+res_new:
+	.space 24
+	.globl blk_block
+blk_block:
 	.space 10
