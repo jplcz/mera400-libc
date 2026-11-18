@@ -8,7 +8,7 @@
 """Runs tests/c/test_stdio.c with a memory-mapped console and compares the
 captured output with the text a C99 printf produces.
 
-usage: test_stdio.py <program.elf> [large]
+usage: test_stdio.py <program.elf> [small|large [float|nofloat]]
 """
 
 import sys
@@ -26,6 +26,8 @@ a|  b|c  |
 abc|       abc|abc       |abc|(null)
   042||+5    |44|     7|xy
 0x1234 %
+"""
+EXPECTED_FLOAT = """\
 1.500000|-0.000|    3.14|2.3     |+7.0
 1.234568e+04|1.23e-04|1.000000E+30
 100000|1e+06|0.0001|1e-05|3.5
@@ -33,6 +35,13 @@ abc|       abc|abc       |abc|(null)
 0.667|0.3333333333|10.0|1000000.000000
 3.|1.50000|0.000
 10000000000.00 -123.46
+"""
+# Without floating point: the placeholder, and the next arguments still match.
+EXPECTED_NOFLOAT = """\
+?float?|?float?|?float?  |   ?float?|77
+?float? ?float? k 123456 ok
+"""
+EXPECTED_TAIL = """\
 puts line
 x
 fputs line
@@ -42,6 +51,9 @@ n=4
 """
 
 large = len(sys.argv) > 2 and sys.argv[2] == "large"
+with_float = len(sys.argv) > 3 and sys.argv[3] == "float"
+EXPECTED += EXPECTED_FLOAT if with_float else EXPECTED_NOFLOAT
+EXPECTED += EXPECTED_TAIL
 ck = Checker("stdio")
 img = Image(sys.argv[1])
 port = 0xFFFF if large else 0x7FFF

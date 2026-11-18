@@ -74,7 +74,8 @@ if(MERA400_C_ENABLED)
                          "${CMAKE_CURRENT_BINARY_DIR}")
     mera400_add_executable(stdio_test SOURCES c/test_stdio.c LIBRARIES c builtins)
     add_test(NAME stdio COMMAND ${_py} ${SIM}/test_stdio.py stdio_test.elf
-                                ${MERA400_MODEL})
+                                ${MERA400_MODEL}
+                                $<IF:$<BOOL:${MERA400_STDIO_FLOAT}>,float,nofloat>)
     mera400_add_executable(math_test SOURCES c/test_math.c LIBRARIES c builtins)
     add_test(NAME math COMMAND ${_py} ${SIM}/test_math.py math_test.elf
                                ${MERA400_MODEL})

@@ -15,10 +15,20 @@
  * 39-bit mantissa, about 11 decimal digits): digits beyond the 17th are
  * printed as zeros and the last digits printed beyond 11 are not meaningful.
  * Rounding is "half up" on the decimal digits that were generated.
+ *
+ * They are compiled only when MERA400_STDIO_FLOAT is 1 (CMake option
+ * MERA400_STDIO_FLOAT, default OFF): the software floating point makes
+ * printf about 28 KB larger. When it is 0, %f %F %e %E %g %G consume their
+ * double argument and print the placeholder "?float?" (honouring width and
+ * the - flag), and no floating point code is linked.
  */
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifndef MERA400_STDIO_FLOAT
+#define MERA400_STDIO_FLOAT 0
+#endif
 
 struct out {
   FILE *f;
@@ -124,6 +134,8 @@ static void integer(struct out *o, int fl, int width, int prec, unsigned base,
 }
 
 /* --- floating point ------------------------------------------------------ */
+
+#if MERA400_STDIO_FLOAT
 
 #define MAXDIG 48
 
@@ -289,6 +301,8 @@ static void real(struct out *o, int fl, int width, int prec, int conv,
   field(o, fl, width, prefix, 0, body, len);
 }
 
+#endif /* MERA400_STDIO_FLOAT */
+
 /* --- the formatter ------------------------------------------------------- */
 
 static int vformat(struct out *o, const char *fmt, va_list ap) {
@@ -408,7 +422,14 @@ static int vformat(struct out *o, const char *fmt, va_list ap) {
     case 'E':
     case 'g':
     case 'G':
+#if MERA400_STDIO_FLOAT
       real(o, fl, width, prec, c, va_arg(ap, double));
+#else
+      /* Only fetch the argument (3 words) and print a placeholder, so that
+         the following conversions still get their own arguments. */
+      (void)va_arg(ap, double);
+      field(o, fl & ~F_ZERO, width, "", 0, "?float?", 7);
+#endif
       break;
     case 'n':
       *va_arg(ap, int *) = (int)o->n;

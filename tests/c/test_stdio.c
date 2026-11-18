@@ -32,8 +32,14 @@ static int fmt_into(char *buf, size_t n, const char *fmt, ...) {
   return r;
 }
 
+#ifndef MERA400_STDIO_FLOAT
+#define MERA400_STDIO_FLOAT 0
+#endif
+
+#if MERA400_STDIO_FLOAT
 /* volatile: keep the compiler from folding the conversions away. */
 static volatile double vd;
+#endif
 
 int main(void) {
   char buf[40], word[16];
@@ -51,6 +57,7 @@ int main(void) {
   printf("%5.3d|%.0d|%-+6d|%hhu|%*d|%.*s\n", 42, 0, 5, 300, 6, 7, 2, "xyz");
   printf("%p %%\n", (void *)0x1234);
 
+#if MERA400_STDIO_FLOAT
   vd = 1.5;
   printf("%f|%.3f|%8.2f|%-8.1f|%+.1f\n", vd, -0.0004, 3.14159, 2.26, 7.0);
   vd = 12345.678;
@@ -61,13 +68,23 @@ int main(void) {
   printf("%.3g|%.10g|%.1f|%f\n", vd, 1.0 / 3.0, 9.96, 999999.9999999);
   printf("%#.0f|%#g|%.3f\n", 3.0, 1.5, 1e-9);
   printf("%.2f %.2f\n", 1e10, -123.456);
+#else
+  /* Placeholder "?float?"; each double must still use up its 3 words. */
+  printf("%f|%5.1f|%-9e|%10g|%d\n", 1.5, 2.5, 3.5, 4.5, 77);
+  printf("%.2E %G %c %ld %s\n", 1e30, 0.5, 'k', 123456L, "ok");
+#endif
 
   n = snprintf(buf, 5, "%s", "abcdefgh");
   CHECK(n == 8 && strcmp(buf, "abcd") == 0);
   n = sprintf(buf, "%d-%s-%c", 12, "ab", 'z');
   CHECK(n == 7 && strcmp(buf, "12-ab-z") == 0);
+#if MERA400_STDIO_FLOAT
   n = fmt_into(buf, sizeof buf, "%03d:%.2f", 5, 2.5);
   CHECK(n == 8 && strcmp(buf, "005:2.50") == 0);
+#else
+  n = fmt_into(buf, sizeof buf, "%03d:%.2f:%d", 5, 2.5, 6);
+  CHECK(n == 14 && strcmp(buf, "005:?float?:6") == 0);
+#endif
   CHECK(snprintf(0, 0, "%ld", 123456L) == 6);
 
   n = sscanf("12 abc Z -7 0x1f", "%d %s %c %d %x", &a, word, &c, &b, &h);
@@ -75,6 +92,14 @@ int main(void) {
         b == -7 && h == 0x1f);
   CHECK(sscanf("x", "%d", &a) == 0);
   CHECK(sscanf("", "%d", &a) == EOF);
+  /* sscanf has no floating point conversions at all (in either mode): the
+     conversion fails, stops the scan and stores nothing. */
+  {
+    unsigned fv[2] = {5, 5}; /* room for a float: must stay untouched */
+    a = b = 0;
+    CHECK(sscanf("12 3.5 9", "%d %f %d", &a, fv, &b) == 1 && a == 12 &&
+          b == 0 && fv[0] == 5 && fv[1] == 5);
+  }
 
   puts("puts line");
   putchar('x');

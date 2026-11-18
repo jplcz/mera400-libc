@@ -99,8 +99,22 @@ if(MERA400_PLATFORM STREQUAL "crook" AND MERA400_C_ENABLED)
 endif()
 message(STATUS "Target triple: ${MERA400_TRIPLE}")
 
+# --- Floating point in printf --------------------------------------------------
+# The soft-float conversions (%f %e %g ...) make printf about 28 KB larger and
+# need extra RAM, which small targets (e.g. EM400 with 16 KB) do not have.
+set(MERA400_STDIO_FLOAT OFF CACHE BOOL
+    "Support floating point conversions (%f %e %g) in the printf family")
+
 include(Mera400)
 mera400_check_tools()
+
+# Every C source (library and tests) sees the choice as a 0/1 macro.
+if(MERA400_STDIO_FLOAT)
+  list(APPEND MERA400_CLANG_MODEL_FLAGS -DMERA400_STDIO_FLOAT=1)
+else()
+  list(APPEND MERA400_CLANG_MODEL_FLAGS -DMERA400_STDIO_FLOAT=0)
+endif()
+message(STATUS "stdio floating point conversions: ${MERA400_STDIO_FLOAT}")
 
 # Every C source learns the CROOK version from __CROOK_VERSION__ (crook.h
 # declares the CROOK-5-only calls only for version 5). The new driver defines
