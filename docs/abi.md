@@ -351,6 +351,11 @@ specifics:
 * Assemble: `llvm-mc -triple=mera400-unknown-none -filetype=obj file.s`
   (add `--defsym=MERA400_LARGE=1` for the large model). In CMake use
   `mera400_add_executable(name SOURCES a.c b.s LIBRARIES c builtins)`.
+* **CROOK versions.** Under CROOK, `__CROOK_VERSION__` (4 or 5, set by Clang's
+  `-mcrook-version=`) tells the source which CROOK it is built for. The ABI,
+  data layout and image format are the same for both; only the availability
+  of the CROOK-5 memory extracodes (GMEM, RMEM, LRAM) differs, see the
+  README, section "CROOK versions: 4 and 5".
 
 ## 13. Examples
 

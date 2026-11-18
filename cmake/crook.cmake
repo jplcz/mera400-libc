@@ -31,6 +31,9 @@
 #   MERA400_CROOK_IMAGE_WORDS  size of the image including the zero padding
 #                              that is the program's .bss, heap and stack
 #   MERA400_CROOK_STACK_WORDS  words reserved at the top for the stack
+#   MERA400_CROOK_VERSION      4 or 5 (default 5): the CROOK version to build
+#                              for; defined in the top level CMakeLists.txt
+#                              (CROOK-4 has no GMEM, RMEM or LRAM)
 # The linker script works in bytes, so these are doubled when passed on.
 
 set(MERA400_CROOK_BASE 0 CACHE STRING
@@ -117,6 +120,7 @@ function(crook_add_executable name)
     set(_link "${MERA400_CLANG}" --target=${MERA400_TRIPLE}
         -mcrook-base=${ARG_BASE} -mcrook-image=${ARG_IMAGE_WORDS}
         -mcrook-stack=${ARG_STACK_WORDS}
+        -mcrook-version=${MERA400_CROOK_VERSION}
         -L${_crt0_dir} -L${_ld_dir} -L${MERA400_LIB_DIR} ${_wl}
         ${_objs})
     add_custom_command(

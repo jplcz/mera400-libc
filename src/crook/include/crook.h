@@ -32,10 +32,17 @@ unsigned __crook_read(unsigned blk);
 unsigned __crook_writ(unsigned blk);
 unsigned __crook_tmem(unsigned blk);
 
-/* Values returned in R4. */
+/* Values returned in R4. GMEM and RMEM exist in CROOK-5 only (CROOK-4 has no
+ * non-contiguous memory map), so they are declared only when the program is
+ * built for CROOK 5 or later: __CROOK_VERSION__ is 4 or 5, set by Clang's
+ * -mcrook-version=. A call in a CROOK-4 build is a compile error instead of
+ * an alarm on the real system. LRAM (0272, also CROOK-5 only) has no wrapper;
+ * reach it with __crook_exl. */
 unsigned __crook_core(unsigned arg);
+#if !defined(__CROOK_VERSION__) || __CROOK_VERSION__ >= 5
 unsigned __crook_gmem(unsigned arg);
 unsigned __crook_rmem(unsigned arg);
+#endif
 unsigned __crook_wait(unsigned arg);
 unsigned __crook_date(unsigned arg);
 unsigned __crook_time(unsigned arg);

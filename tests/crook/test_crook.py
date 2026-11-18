@@ -16,7 +16,11 @@ The program is run twice: once with a fake INPR that stores the record's CR
 terminator in the buffer and once with one that does not, because the CROOK
 manual does not say which it is (the library must work with both).
 
-usage: test_crook.py <program.elf> <program.bin>
+usage: test_crook.py <program.elf> <program.bin> [4|5]
+
+The optional version (default 5) is the CROOK version the program was built
+for. The fake CROOK of version 4 has no GMEM (0270), RMEM (0271) or LRAM
+(0272): it records the call as an error, and the test fails if there is one.
 """
 
 import os
@@ -28,8 +32,11 @@ from libtest import Checker          # noqa: E402
 from m400sim import Cpu, Elf, Halted, FC  # noqa: E402
 
 END, ASG, DATE, CORE, WAIT, INPR, PRIR, PRIN = 0o373, 0o200, 0o252, 0o232, 0o247, 0o212, 0o213, 0o215
+CROOK5_ONLY = {0o270: "GMEM", 0o271: "RMEM", 0o272: "LRAM"}
+version = int(sys.argv[3]) if len(sys.argv) > 3 else 5
+rejected = []                          # CROOK-5 only extracodes called on CROOK 4
 
-ck = Checker("crook")
+ck = Checker("crook" if version == 5 else "crook%d" % version)
 elf = Elf(sys.argv[1])
 sym = elf.symbols                      # BYTE addresses
 
@@ -100,6 +107,9 @@ def run(store_terminator):
         elif n == CORE:
             log.append(("CORE", r4))
             cpu.r[4] = 0x2FFF
+        elif n in CROOK5_ONLY and version == 4:
+            rejected.append(CROOK5_ONLY[n])
+            raise Halted(n)
         elif n == END:
             log.append(("END", r4))
             raise Halted(END)
@@ -173,5 +183,6 @@ want = b"".join(bytes([mem[base + i] >> 8, mem[base + i] & 0xFF]) for i in range
 ck.check(flat == want, "raw image equals the linked ELF image")
 ck.check(((flat[0] << 8) | flat[1]) == mem[base], "first word is crt0's first instruction")
 ck.check(sym["__heap_start"] <= sym["__heap_end"] <= sym["__stack_top"], "heap below stack")
+ck.check(not rejected, "CROOK %d has no %s" % (version, ", ".join(rejected)))
 
 ck.finish()

@@ -1,7 +1,7 @@
 # tests
 
 Run everything with `ctest --test-dir build --output-on-failure` (use
-`build-large` and `build-crook` for the other configurations; see the top
+`build-large`, `build-crook` and `build-crook4` for the other configurations; see the top
 level README). Some tests exist only in some configurations.
 
 | Test | What it proves |
@@ -19,7 +19,8 @@ level README). Some tests exist only in some configurations.
 | `start-first` | `_start` is at the image start for every position of crt0 on the link line |
 | `gc-sections` | a program using one function does not contain unused library functions (checked with `llvm-nm`) |
 | `host-c-logic` | the portable C sources, compiled for the build computer (algorithms only) |
-| `crook`, `crook-stdio` | only with `-DMERA400_PLATFORM=crook`: whole CROOK programs run against a fake operating system; `crook-stdio` checks that `printf` output arrives as line records |
+| `crook`, `crook-stdio` | only with `-DMERA400_PLATFORM=crook`: whole CROOK programs run against a fake operating system; `crook-stdio` checks that `printf` output arrives as line records. With `-DMERA400_CROOK_VERSION=4` the fake CROOK has no GMEM, RMEM or LRAM and the test fails if the program calls one |
+| `crook-version-guard` | only with crook: `<crook.h>` declares GMEM and RMEM exactly when `__CROOK_VERSION__` is 5 (a compile-only check of `crook/crook_guard.c`) |
 
 Directories:
 

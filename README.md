@@ -87,7 +87,8 @@ Both models and both platforms (each in its own build directory):
 ```sh
 cmake -S . -B build        ... && cmake --build build        && ctest --test-dir build        # none, small
 cmake -S . -B build-large  ... -DMERA400_MODEL=large      && ...                              # none, large
-cmake -S . -B build-crook  ... -DMERA400_PLATFORM=crook   && ...                              # crook, small
+cmake -S . -B build-crook  ... -DMERA400_PLATFORM=crook   && ...                              # crook (5), small
+cmake -S . -B build-crook4 ... -DMERA400_PLATFORM=crook -DMERA400_CROOK_VERSION=4 && ...      # crook 4, small
 ```
 
 (`...` is the toolchain and `LLVM_BIN_DIR` options above.) CROOK with the
@@ -103,6 +104,7 @@ Options:
 | `MERA400_BUILD_C` | `AUTO` (default: build the C files only if `clang --print-targets` lists `mera400`), `ON` (require it), `OFF` |
 | `MERA400_PLATFORM` | `none` (default, bare metal) or `crook` (also builds `libcrook.a`, `crt0_crook`, the CROOK test; see "CROOK platform") |
 | `MERA400_CROOK_BASE`, `MERA400_CROOK_IMAGE_WORDS`, `MERA400_CROOK_STACK_WORDS` | crook only: load address, image size and stack size, all in 16-bit words (defaults 0, 8192, 512) |
+| `MERA400_CROOK_VERSION` | crook only: `5` (default) or `4`, the CROOK version to build for (see "CROOK versions: 4 and 5") |
 
 The CROOK configuration also needs Python 3 for `tools/image2assm.py` (see
 "CROOK platform").
@@ -199,7 +201,8 @@ clang --target=mera400-unknown-crook -L$B/crt0_crook.dir -Lcrt -L$B/lib/small \
 The driver links `crt0-crook.o`, your objects, `libcrook.a`, `libc.a` and
 `libbuiltins.a` with `crook.ld` and `--gc-sections`. The three `-mcrook-*`
 options count **words** (defaults 0, 8192, 512) and become the linker symbols
-`__image_base`, `__image_size`, `__stack_size` (in bytes). An output file name
+`__image_base`, `__image_size`, `__stack_size` (in bytes). `-mcrook-version=4|5`
+(default 5) selects the CROOK version (see "CROOK versions: 4 and 5"). An output file name
 ending in `.bin` gives the raw image instead of an ELF file.
 
 **The image.** `name.bin` is a sequence of 16-bit words, each stored high
@@ -265,6 +268,43 @@ cannot be read via `getchar`.
 
 **Tested** only on the Python simulator in `tests/crook`, with a fake CROOK
 handler for EXL (exit, file assignment, record I/O, date, core).
+
+### CROOK versions: 4 and 5
+
+*Why.* CROOK exists in several versions. This library supports **CROOK-4** and
+**CROOK-5** (CROOK-1, 2 and 3 are not supported). As far as a compiled program
+can see they are the same system: the same extracodes (numbers and parameter
+blocks), streams, text conventions and way of ending a program. They differ
+in memory management only. CROOK-5 has the extracodes **GMEM** (0270, get
+memory blocks), **RMEM** (0271, release memory blocks) and **LRAM** (0272,
+information about a RAM file), and a memory map that need not be contiguous.
+CROOK-4 has none of them: a process owns one contiguous block that **CORE**
+(0232) can resize.
+
+*How.* Choose the version when you configure, with the CMake option
+`MERA400_CROOK_VERSION` (`4` or `5`, default `5`), and when you build by hand
+with Clang's `-mcrook-version=4` or `-mcrook-version=5`. Clang then defines the
+macro `__CROOK_VERSION__` (4 or 5), and `<crook.h>` declares `__crook_gmem`
+and `__crook_rmem` only for version 5. Calling one in a CROOK-4 build is a
+compile error, so the mistake shows up on your computer and not as an alarm
+on the CROOK machine. (LRAM has no wrapper in this library.) The program image
+is the same for both versions; there is one library, not two.
+
+```sh
+cmake -S . -B build-crook4 ... -DMERA400_PLATFORM=crook -DMERA400_CROOK_VERSION=4
+clang --target=mera400-unknown-crook -mcrook-version=4 --sysroot=<sysroot> hello.c -o hello.bin
+```
+
+`malloc` does not call CROOK on either version: its heap is the static region
+between `.bss` and the stack, sized by `MERA400_CROOK_IMAGE_WORDS`. Growing
+it with CORE is not done.
+
+*Tests.* In a CROOK-4 configuration the fake CROOK of `tests/crook` has no
+GMEM, RMEM or LRAM: if the program calls one the test fails. The test
+`crook-version-guard` compiles `tests/crook/crook_guard.c` to check that
+`<crook.h>` declares GMEM and RMEM exactly for version 5. A CROOK-4 image
+cannot be run on a real system here: no CROOK-4 disk image and no emulator
+support for it are known, so CROOK-4 is tested against the fake CROOK only.
 
 ### CROOK: open questions
 

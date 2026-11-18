@@ -12,9 +12,19 @@ crook_add_executable(crook_test SOURCES crook_main.s)
 
 add_test(NAME crook
          COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_crook.py
-                 crook_test.elf crook_test.bin)
+                 crook_test.elf crook_test.bin ${MERA400_CROOK_VERSION})
 set_tests_properties(crook PROPERTIES
                      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+
+# GMEM and RMEM are declared by <crook.h> for CROOK 5 only.
+if(MERA400_C_ENABLED)
+  add_test(NAME crook-version-guard
+           COMMAND ${MERA400_CLANG} --target=${MERA400_TRIPLE} -ffreestanding
+                   -nostdlibinc ${MERA400_CLANG_MODEL_FLAGS}
+                   -isystem ${MERA400_ROOT}/include
+                   -isystem ${MERA400_CROOK_INCLUDE_DIR}
+                   -fsyntax-only ${CMAKE_CURRENT_SOURCE_DIR}/crook_guard.c)
+endif()
 
 # A program links from the INSTALLED sysroot with no -L: install into the build
 # tree, then run the plain driver command and the same fake-CROOK test on the
@@ -26,6 +36,7 @@ if(MERA400_CROOK_DRIVER)
   add_test(NAME crook-sysroot-link
            COMMAND ${MERA400_CLANG} --target=${MERA400_TRIPLE} --sysroot=${_sysroot}
                    ${CMAKE_CURRENT_SOURCE_DIR}/crook_main.s
+                   -mcrook-version=${MERA400_CROOK_VERSION}
                    -o ${CMAKE_CURRENT_BINARY_DIR}/sysroot_test.bin)
   add_test(NAME crook-sysroot-image
            COMMAND ${CMAKE_COMMAND} -E compare_files

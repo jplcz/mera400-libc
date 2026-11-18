@@ -38,6 +38,14 @@ set_property(CACHE MERA400_PLATFORM PROPERTY STRINGS none crook)
 if(NOT MERA400_PLATFORM MATCHES "^(none|crook)$")
   message(FATAL_ERROR "MERA400_PLATFORM must be none or crook")
 endif()
+# The CROOK version the program is built for. CROOK-4 and CROOK-5 differ only
+# in memory management: GMEM, RMEM and LRAM exist in CROOK-5 only.
+set(MERA400_CROOK_VERSION 5 CACHE STRING
+    "CROOK: operating system version to build for, 4 or 5")
+set_property(CACHE MERA400_CROOK_VERSION PROPERTY STRINGS 4 5)
+if(NOT MERA400_CROOK_VERSION MATCHES "^[45]$")
+  message(FATAL_ERROR "MERA400_CROOK_VERSION must be 4 or 5 (CROOK-1, 2 and 3 are not supported)")
+endif()
 
 # --- C compiler (optional) --------------------------------------------------
 # There is no Clang target for the MERA-400 yet, so C sources are built only
@@ -81,9 +89,10 @@ set(MERA400_TRIPLE "mera400-unknown-none")
 set(MERA400_CROOK_DRIVER OFF)
 if(MERA400_PLATFORM STREQUAL "crook" AND MERA400_C_ENABLED)
   execute_process(COMMAND "${MERA400_CLANG}" --target=mera400-unknown-crook
+                          -mcrook-version=${MERA400_CROOK_VERSION}
                           -E -dM -x c /dev/null
                   OUTPUT_VARIABLE _crook_macros ERROR_QUIET)
-  if(_crook_macros MATCHES "__CROOK__")
+  if(_crook_macros MATCHES "__CROOK_VERSION__")
     set(MERA400_TRIPLE "mera400-unknown-crook")
     set(MERA400_CROOK_DRIVER ON)
   endif()
@@ -92,6 +101,17 @@ message(STATUS "Target triple: ${MERA400_TRIPLE}")
 
 include(Mera400)
 mera400_check_tools()
+
+# Every C source learns the CROOK version from __CROOK_VERSION__ (crook.h
+# declares the CROOK-5-only calls only for version 5). The new driver defines
+# it; with an older clang the macro is defined here.
+if(MERA400_PLATFORM STREQUAL "crook")
+  if(MERA400_CROOK_DRIVER)
+    list(APPEND MERA400_CLANG_MODEL_FLAGS -mcrook-version=${MERA400_CROOK_VERSION})
+  else()
+    list(APPEND MERA400_CLANG_MODEL_FLAGS -D__CROOK_VERSION__=${MERA400_CROOK_VERSION})
+  endif()
+endif()
 
 # --- crt0 -------------------------------------------------------------------
 # Built as an object (not in the archive): it must be linked first and

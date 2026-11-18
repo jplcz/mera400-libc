@@ -22,6 +22,12 @@ that traps into the operating system; the argument is in register R4.
 `__crook_time` is the raw TIME extracode; there is no C `time()` because the
 epoch/year base of DATE is unknown.
 
+`__crook_gmem` and `__crook_rmem` (GMEM, RMEM) exist in CROOK-5 only; `crook.h`
+declares them only when `__CROOK_VERSION__` is 5 (Clang's `-mcrook-version=`),
+so a CROOK-4 build cannot call them. LRAM (0272, CROOK-5 only) has no wrapper.
+The wrappers are in separate sections, so with `--gc-sections` an unused one is
+not in the image.
+
 ## TODO: not implemented (argument layout not verified)
 
 ERS 0207 (close), ERF 0206, FBOF 0211, FEOF 0217, EOF 0216 (STR-type

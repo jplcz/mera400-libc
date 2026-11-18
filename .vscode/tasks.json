@@ -87,6 +87,35 @@
       "problemMatcher": []
     },
     {
+      "label": "configure (CROOK-4)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S", "${workspaceFolder}",
+        "-B", "${workspaceFolder}/build-crook4",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/mera400-toolchain.cmake",
+        "-DMERA400_PLATFORM=crook",
+        "-DMERA400_CROOK_VERSION=4",
+        "-DLLVM_BIN_DIR=${input:llvmBinDir}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build (CROOK-4)",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build-crook4"],
+      "problemMatcher": []
+    },
+    {
+      "label": "test (CROOK-4)",
+      "type": "shell",
+      "command": "ctest",
+      "args": ["--test-dir", "${workspaceFolder}/build-crook4", "--output-on-failure"],
+      "dependsOn": "build (CROOK-4)",
+      "problemMatcher": []
+    },
+    {
       "label": "image2assm (CROOK image to ASSM text)",
       "type": "shell",
       "command": "python3",
