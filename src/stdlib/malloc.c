@@ -16,17 +16,18 @@
    free successor, and malloc() merges runs of free blocks while it
    searches, so no separate free list is needed. */
 typedef struct block {
-  unsigned int size; /* bytes of data after the header */
-  unsigned int free;
+  size_t size; /* bytes of data after the header (size_t: 32 bits when large) */
+  size_t free;
 } block;
 
 extern char __heap_start[];
 extern char __heap_end[];
+#define HEAP_END __heap_end
 
 static block *first;
 
 static void init(void) {
-  size_t total = (size_t)(__heap_end - __heap_start);
+  size_t total = (size_t)(HEAP_END - __heap_start);
   first = (block *)__heap_start;
   first->size = total - sizeof(block);
   first->free = 1;
@@ -34,14 +35,14 @@ static void init(void) {
 
 static block *next(block *b) {
   block *n = (block *)((char *)(b + 1) + b->size);
-  return (char *)n < __heap_end ? n : NULL;
+  return (char *)n < HEAP_END ? n : NULL;
 }
 
 void *malloc(size_t n) {
   block *b;
   if (!first)
     init();
-  n = (n + 3) & ~3u; /* two words: keeps every block word aligned */
+  n = (n + 3) & ~(size_t)3; /* two words: keeps every block word aligned */
   if (n == 0)
     n = 4;
   for (b = first; b; b = next(b)) {

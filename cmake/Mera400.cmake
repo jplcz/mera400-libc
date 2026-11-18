@@ -96,9 +96,30 @@ function(_mera400_object out_var source target)
       # a program does not use: code size matters on a machine with 64K words.
       COMMAND "${MERA400_CLANG}" --target=mera400-unknown-none -ffreestanding
               -nostdlibinc -O2 -ffunction-sections -fdata-sections
-              ${MERA400_CLANG_MODEL_FLAGS}
-              -isystem "${MERA400_ROOT}/include" -c "${_abs}" -o "${_obj}"
+              ${MERA400_CLANG_MODEL_FLAGS} ${MERA400_COMPILE_OPTIONS}
+              -isystem "${MERA400_ROOT}/include" -MD -MF "${_obj}.d"
+              -c "${_abs}" -o "${_obj}"
       DEPENDS "${_abs}"
+      DEPFILE "${_obj}.d"
+      COMMENT "Compiling ${source}"
+      VERBATIM)
+  elseif(_ext STREQUAL ".cpp")
+    if(NOT MERA400_C_ENABLED)
+      message(FATAL_ERROR "C++ source ${source} needs MERA400_BUILD_C")
+    endif()
+    add_custom_command(
+      OUTPUT "${_obj}"
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir"
+      # Freestanding C++: no exceptions, no run-time type information, no
+      # standard library; the C headers of this library are available.
+      COMMAND "${MERA400_CLANGXX}" --target=mera400-unknown-none -ffreestanding
+              -nostdlibinc -nostdinc++ -O2 -ffunction-sections -fdata-sections
+              -fno-exceptions -fno-rtti -fno-threadsafe-statics
+              ${MERA400_CLANG_MODEL_FLAGS} ${MERA400_COMPILE_OPTIONS}
+              -isystem "${MERA400_ROOT}/include" -MD -MF "${_obj}.d"
+              -c "${_abs}" -o "${_obj}"
+      DEPENDS "${_abs}"
+      DEPFILE "${_obj}.d"
       COMMENT "Compiling ${source}"
       VERBATIM)
   else()
@@ -131,8 +152,9 @@ function(mera400_add_library name)
 endfunction()
 
 function(mera400_add_executable name)
-  cmake_parse_arguments(ARG "BINARY" "" "SOURCES;LIBRARIES;LINK_OPTIONS" ${ARGN})
+  cmake_parse_arguments(ARG "BINARY" "" "SOURCES;LIBRARIES;LINK_OPTIONS;COMPILE_OPTIONS" ${ARGN})
   mera400_check_tools()
+  set(MERA400_COMPILE_OPTIONS ${ARG_COMPILE_OPTIONS})
   set(_objs)
   foreach(_src ${ARG_SOURCES})
     _mera400_object(_obj "${_src}" "${name}")
@@ -149,9 +171,9 @@ function(mera400_add_executable name)
   # crt0.o is deliberately the first input.
   add_custom_command(
     OUTPUT "${_elf}"
-    COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-            --gc-sections
-            ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS} "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>"
+    COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
+            -T "${MERA400_LINKER_SCRIPT}" --gc-sections
+            "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>"
             ${_objs} ${_libs} -o "${_elf}"
     DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"
     COMMENT "Linking ${name}.elf"
@@ -161,8 +183,8 @@ function(mera400_add_executable name)
     set(_bin "${CMAKE_CURRENT_BINARY_DIR}/${name}.bin")
     add_custom_command(
       OUTPUT "${_bin}"
-      COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-              --gc-sections --oformat=binary ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
+      COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
+              -T "${MERA400_LINKER_SCRIPT}" --gc-sections --oformat=binary
               "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>" ${_objs} ${_libs}
               -o "${_bin}"
       DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"

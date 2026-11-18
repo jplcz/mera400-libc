@@ -1,16 +1,25 @@
 # tests
 
-Run everything with `ctest --test-dir build --output-on-failure`.
+Run everything with `ctest --test-dir build --output-on-failure` (use
+`build-large` and `build-crook` for the other configurations; see the top
+level README). Some tests exist only in some configurations.
 
 | Test | What it proves |
 |------|----------------|
-| `string` | all assembly string functions against Python references (7254 checks) |
-| `builtins` | all eight 16-bit helpers against Python arithmetic (16164 checks) |
-| `crt0` | start-up: stack, `.bss` cleared from junk, `main` result, final `hlt`; flat binary equals the ELF image |
-| `decoder-vs-objdump` | the simulator decodes every instruction like `llvm-objdump` (mnemonic and length) |
+| `string` | (small model) the assembly string functions against Python references, including exhaustive alignment, overlap and `memcmp` difference positions |
+| `mem-on-target` | (none platform, both models) a C program running on the simulator checks every `mem*`/`str*` function exhaustively on global and stack buffers (in the large model the stack is above word 0x8000) |
+| `builtins` | the 16-bit integer helpers against Python arithmetic |
+| `m48-float` | the software `__m48_*` floating-point helpers against `sim/m48ref.py` with random and edge-case vectors |
+| `c-on-target` | the portable C code (`qsort`, `malloc`, ...) compiled by Clang and run on the simulator |
+| `stdio` | `printf`, `sprintf`, `snprintf`, `sscanf` and the console hook on the simulator |
+| `math` | the `math.h` functions against Python's `math` within an accuracy bound |
+| `init`, `init-abort`, `init-cpp` | constructors (with priorities), destructors, `atexit` order, `exit` and `abort`; the C++ variant uses `clang++` static objects. In the large model `init-cpp` is an expected failure (`WILL_FAIL`): Clang stores the 1-byte destructor guard with `rb r, symbol`, using the symbol's word address as a byte address (repro: `static _Bool f; void set(void){f=1;} _Bool get(void){return f;}` with `-mlarge-memory`) |
+| `crt0` | start-up: stack, `.bss` cleared from junk, `main` result, final `hlt` |
+| `decoder-vs-objdump` | the simulator decodes every instruction like `llvm-objdump` |
 | `start-first` | `_start` is at the image start for every position of crt0 on the link line |
+| `gc-sections` | a program using one function does not contain unused library functions (checked with `llvm-nm`) |
 | `host-c-logic` | the portable C sources, compiled for the build computer (algorithms only) |
-| `crook` | only with `-DMERA400_PLATFORM=crook`: a whole CROOK program (crt0, `puts`, `getchar`, extracode wrappers, exit) runs on the simulator against a fake CROOK operating system; also checks the raw `.bin` image |
+| `crook`, `crook-stdio` | only with `-DMERA400_PLATFORM=crook`: whole CROOK programs run against a fake operating system; `crook-stdio` checks that `printf` output arrives as line records |
 
 Directories:
 

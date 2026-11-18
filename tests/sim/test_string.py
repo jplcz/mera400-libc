@@ -8,7 +8,8 @@
 """Runs every string function on the simulator and compares the result and
 every changed byte with a Python reference.
 
-usage: test_string.py <image.elf>   (an image containing libc.a)
+usage: test_string.py <image.elf> [--large]   (an image containing the string
+       functions; --large: the large memory model's calling convention)
 
 Covered: odd/even alignment of every pointer, n = 0, overlapping memmove in
 both directions, bytes >= 0x80, objects that end at the last byte of the
@@ -24,10 +25,42 @@ rng = random.Random(1)
 img = Image(sys.argv[1])
 ck = Checker("string")
 TOP = 0x10000
+LARGE = "--large" in sys.argv
+
+# Large model calling convention: a pointer or size_t is 32 bits (high word
+# first), an int is one word. An argument that does not fit in what is left of
+# r1..r3 goes, whole, to the stack (0(r7) = its high word). Results: pointers
+# and size_t in r1:r2, int in r1. "p" = pointer, "i" = int, "z" = size_t.
+SIGS = {
+    "memcpy": ("ppz", "p"), "memmove": ("ppz", "p"), "memset": ("piz", "p"),
+    "memcmp": ("ppz", "i"), "memchr": ("piz", "p"), "strlen": ("p", "z"),
+    "strcpy": ("pp", "p"), "strncpy": ("ppz", "p"), "strcat": ("pp", "p"),
+    "strncat": ("ppz", "p"), "strcmp": ("pp", "i"), "strncmp": ("ppz", "i"),
+    "strchr": ("pi", "p"), "strrchr": ("pi", "p"),
+}
+
+
+def large_call(m, orig, sym, *args, **kw):
+    kinds, ret = SIGS[sym]
+    regs, stack = [], []
+    for k, v in zip(kinds, args):
+        ws = [v & 0xFFFF] if k == "i" else [(v >> 16) & 0xFFFF, v & 0xFFFF]
+        if len(regs) + len(ws) <= 3:
+            regs += ws
+        else:
+            stack += ws
+    r = orig(sym, *regs, stack=stack, **kw)
+    if ret in "pz":
+        return (m.cpu.r[1] << 16) | m.cpu.r[2]
+    return r
 
 
 def fresh():
-    return img.machine()
+    m = img.machine()
+    if LARGE:
+        orig = m.call
+        m.call = lambda sym, *a, **kw: large_call(m, orig, sym, *a, **kw)
+    return m
 
 
 def rnd_bytes(n, nonzero=False, high=False):
@@ -222,5 +255,68 @@ for trial in range(300):
     r = m.call("strncat", da, sa, n, expect_writes={at + i: part[i] for i in range(len(part))},
                what="strncat n=%d %r" % (n, s), checker=ck)
     ck.check(r == da, "strncat returns dest")
+
+# --- word fast paths: every n, every difference position, every alignment
+for n in range(1, 13):
+    for aa in (0x3000, 0x3001):
+        for ba in (0x5000, 0x5001):
+            base = rnd_bytes(n, high=True)
+            for pos in [None] + list(range(n)):
+                b = bytearray(base)
+                if pos is not None:
+                    b[pos] = (b[pos] + rng.randrange(1, 256)) & 0xFF
+                m = fresh()
+                m.put(aa, base)
+                m.put(ba, bytes(b))
+                r = m.call("memcmp", aa, ba, n, expect_writes={},
+                           what="memcmp n=%d pos=%s" % (n, pos), checker=ck)
+                want = 0 if pos is None else (base[pos] - b[pos]) & 0xFFFF
+                ck.check(r == want, "memcmp n=%d pos=%s aa=%d ba=%d -> %#x want %#x"
+                         % (n, pos, aa & 1, ba & 1, r, want))
+
+# memmove with every overlap, even and odd, both directions, n up to 12
+for n in range(1, 13):
+    for al in (0, 1):
+        for delta in range(-13, 14):
+            m = fresh()
+            s = 0x4000 + al + 14
+            d = s + delta
+            data = rnd_bytes(n, high=True)
+            m.put(s, data)
+            m.call("memmove", d, s, n,
+                   expect_writes={d + i: data[i] for i in range(n)},
+                   what="memmove2 n=%d delta=%d al=%d" % (n, delta, al), checker=ck)
+
+# Large model only: buffers above byte address 0x10000, which no 16-bit byte
+# pointer can reach.
+if LARGE:
+    HI = 0x14000
+    for n in list(range(0, 10)) + [33]:
+        for da in (0, 1):
+            for sa in (0, 1):
+                m = fresh()
+                d, s = HI + 0x1000 + da, HI + 0x3000 + sa
+                data = rnd_bytes(n, high=True)
+                m.put(s, data)
+                r = m.call("memcpy", d, s, n,
+                           expect_writes={d + i: data[i] for i in range(n)},
+                           what="memcpy hi n=%d" % n, checker=ck)
+                ck.check(r == d, "memcpy hi returns dest %#x" % r)
+                m = fresh()
+                r = m.call("memset", d, 0xA5, n,
+                           expect_writes={d + i: 0xA5 for i in range(n)},
+                           what="memset hi n=%d" % n, checker=ck)
+                m = fresh()
+                m.put(s, cstr(n))
+                r = m.call("strlen", s, expect_writes={}, what="strlen hi", checker=ck)
+                ck.check(r == n, "strlen hi %d -> %d" % (n, r))
+    for delta in range(-5, 6):
+        m = fresh()
+        s = HI + 0x2001
+        data = rnd_bytes(9, high=True)
+        m.put(s, data)
+        m.call("memmove", s + delta, s, 9,
+               expect_writes={s + delta + i: data[i] for i in range(9)},
+               what="memmove hi delta=%d" % delta, checker=ck)
 
 ck.finish()

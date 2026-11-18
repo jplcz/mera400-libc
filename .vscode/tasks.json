@@ -73,6 +73,34 @@
       "args": ["--test-dir", "${workspaceFolder}/build-crook", "--output-on-failure"],
       "dependsOn": "build (CROOK)",
       "problemMatcher": []
+    },
+    {
+      "label": "configure (large model)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S", "${workspaceFolder}",
+        "-B", "${workspaceFolder}/build-large",
+        "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/cmake/mera400-toolchain.cmake",
+        "-DMERA400_MODEL=large",
+        "-DLLVM_BIN_DIR=${input:llvmBinDir}"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build (large model)",
+      "type": "shell",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/build-large"],
+      "problemMatcher": []
+    },
+    {
+      "label": "test (large model)",
+      "type": "shell",
+      "command": "ctest",
+      "args": ["--test-dir", "${workspaceFolder}/build-large", "--output-on-failure"],
+      "dependsOn": "build (large model)",
+      "problemMatcher": []
     }
   ]
 }

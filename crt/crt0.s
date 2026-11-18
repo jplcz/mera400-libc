@@ -47,7 +47,8 @@ _start:
 .cleared:
 	rj r4, __libc_init_array
 	lwt r1, 0		; argc
-	lwt r2, 0		; argv
+	lwt r2, 0		; argv (a 32-bit null pointer, r2:r3, in the large model)
+	lwt r3, 0
 	rj r4, main
 	rj r4, exit		; r1 = main's result = exit status
 	; exit does not return

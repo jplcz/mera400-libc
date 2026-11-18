@@ -18,8 +18,8 @@
  * twice its size in words.
  *
  * All numbers in a linker script are BYTE addresses (a word is two bytes).
- * Parameters (change them with --defsym=__arg_NAME=VALUE, e.g.
- * --defsym=__arg_image_base=2048; no need to edit this file):
+ * Parameters (change them with --defsym=NAME=VALUE after -T, e.g.
+ * --defsym=__image_base=2048; no need to edit this file):
  *   __image_base   BYTE address of the first word of the image (default 0,
  *                  the default base of CROOK's assembler). cmake/crook.cmake
  *                  passes 2 * MERA400_CROOK_BASE.
@@ -45,11 +45,11 @@
 
 ENTRY(_start)
 
-/* lld does not let a script use a symbol that --defsym also sets, so the
-   command line passes __arg_* names and the script derives the real ones. */
-__image_base = DEFINED(__arg_image_base) ? __arg_image_base : 0;
-__image_size = DEFINED(__arg_image_size) ? __arg_image_size : 0x4000;
-__stack_size = DEFINED(__arg_stack_size) ? __arg_stack_size : 0x400;
+/* PROVIDE gives the defaults; a --defsym on the command line (given after
+   -T) replaces them. */
+PROVIDE(__image_base = 0);
+PROVIDE(__image_size = 0x4000);
+PROVIDE(__stack_size = 0x400);
 __stack_top = __image_base + __image_size;
 
 SECTIONS

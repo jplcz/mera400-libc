@@ -17,11 +17,15 @@
 ; r4 still holds the caller's return address). Otherwise (dest > src, or
 ; dest == src which needs no work) the bytes are copied backwards.
 ;
-; The backward loop addresses byte r2+r3 and r1+r3 with r3 counting down
+; The backward loops address unit r2+r3 and r1+r3 with r3 counting down
 ; from n to 1 (drb = decrement and branch if not zero). Both pointers are
-; first lowered by one, so the first access is at offset n-1 and the last at
-; offset 0; r1 is raised again before returning. The pointer comparison is
-; unsigned (cl), because byte addresses use the whole 16-bit range.
+; first lowered by one unit, so the first access is at offset n-1 and the
+; last at offset 0. The pointer comparison is unsigned (cl), because byte
+; addresses use the whole 16-bit range.
+;
+; Fast path: when both pointers are even and n >= 2 the copy goes by whole
+; words, backwards; an odd last byte is copied first (it is the highest
+; one). Otherwise the byte loop is used.
 
 	.section .text.memmove,"ax"
 	.globl memmove
@@ -31,16 +35,48 @@ memmove:
 	je .done		; dest == src: nothing to do
 	cwt r3, 0
 	jes .done		; n == 0 (the drb loop needs n >= 1)
-	awt r7, -1
+	awt r7, -3
 	rw r5, r7
+	rw r6, 1+r7
+	rw r1, 2+r7		; remember dest
+	cl r3, 2
+	jls .bytes
+	lw r5, r1
+	or r5, r2
+	nr r5, 1
+	cwt r5, 0
+	jn .bytes		; some pointer is odd
+	lw r5, r3
+	nr r5, 1
+	cwt r5, 0
+	jes .even
+	awt r3, -1		; copy the odd last byte first
+	lb r5, r2+r3
+	rb r5, r1+r3
+	awt r3, 1
+.even:
+	lw r6, r3
+	srz r6			; r6 = number of whole words
+	srz r1			; word addresses, lowered by one word
+	srz r2
+	awt r1, -1
+	awt r2, -1
+.wloop:
+	tw r5, r2+r6
+	rw r5, r1+r6
+	drb r6, .wloop
+	ujs .out
+.bytes:
 	awt r1, -1		; bias so that offset n maps to byte n-1
 	awt r2, -1
 .loop:
 	lb r5, r2+r3
 	rb r5, r1+r3
 	drb r3, .loop
-	awt r1, 1
+.out:
+	tw r1, 2+r7		; r1 = dest
+	tw r6, 1+r7
 	tw r5, r7
-	awt r7, 1
+	awt r7, 3
 .done:
 	uj r4

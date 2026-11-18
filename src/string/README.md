@@ -20,3 +20,13 @@ above `0x7F` compare correctly).
 
 `strextra.c` holds the functions that are simple in C; it is built only when
 the C compiler is available.
+
+`memcpy`, `memmove`, `memset` and `memcmp` have a fast path: when both
+pointers are even (word aligned) and the length is at least 2 they work a
+whole 16-bit word at a time, finishing with one odd byte; otherwise they use
+the byte loop. `memmove` copies backwards when the destination is above the
+source.
+
+**Large model:** these assembly files assume 16-bit byte pointers. The large
+build uses `large/string.c` instead (C compiled with `-mlarge-memory`, 32-bit
+pointers and `size_t`, same word fast paths).

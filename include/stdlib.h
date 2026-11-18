@@ -15,9 +15,14 @@
 #define EXIT_FAILURE 1
 #define RAND_MAX 32767
 
-/* exit and abort are in crt/crt0.s: both stop the processor (hlt). */
+/* exit, _Exit and abort: crt/crt0.s and src/stdlib/exit.s. exit runs the
+   functions registered with atexit (last registered first), then the
+   .fini_array (C++ static destructors), then _Exit, which stops the
+   processor (hlt). */
 void exit(int status);
+void _Exit(int status);
 void abort(void);
+int atexit(void (*func)(void));
 
 int abs(int x);
 long labs(long x);

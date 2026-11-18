@@ -22,6 +22,10 @@
 ; unsigned values and sets the E flag when they are equal; jn jumps when E
 ; is clear. Only after a mismatch are the pointers needed again, so the
 ; mismatching byte of s2 can then be loaded into r1.
+;
+; Fast path: when both pointers are even and n >= 2, whole words are compared
+; (cw). The first differing word is then compared octet by octet (the high
+; octet is the lower address), and a final odd byte is compared separately.
 
 	.section .text.memcmp,"ax"
 	.globl memcmp
@@ -31,8 +35,55 @@ memcmp:
 	lwt r1, 0		; n == 0: equal
 	uj r4
 .start:
-	awt r7, -1
+	awt r7, -2
 	rw r5, r7
+	rw r6, 1+r7
+	cl r3, 2
+	jls .bytes
+	lw r5, r1
+	or r5, r2
+	nr r5, 1
+	cwt r5, 0
+	jn .bytes		; some pointer is odd
+	lw r6, r3
+	srz r6			; r6 = number of whole words
+	srz r1
+	srz r2
+	aw r1, r6
+	aw r2, r6
+	nga r6
+.wloop:
+	tw r5, r1+r6
+	cw r5, [r2+r6]
+	jn .wdiff
+	irb r6, .wloop
+	lw r5, r3
+	nr r5, 1
+	cwt r5, 0
+	jes .equal		; n is even
+	slz r1			; byte addresses of the last byte
+	slz r2
+	lwt r5, 0
+	lb r5, r1
+	cb r5, r2
+	jn .diff
+.equal:
+	lwt r1, 0
+	ujs .exit
+.wdiff:
+	aw r1, r6
+	aw r2, r6
+	slz r1			; byte addresses of the differing words
+	slz r2
+	lwt r5, 0
+	lb r5, r1
+	cb r5, r2
+	jn .diff		; the high octets differ
+	awt r1, 1
+	awt r2, 1
+	lb r5, r1		; the low octets differ
+	ujs .diff
+.bytes:
 	lwt r5, 0
 	aw r1, r3		; r1 = s1 + n
 	aw r2, r3		; r2 = s2 + n
@@ -40,17 +91,19 @@ memcmp:
 .loop:
 	lb r5, r1+r3		; r5 = s1[i]
 	cb r5, r2+r3		; compare with s2[i]
-	jn .diff
+	jn .bdiff
 	irb r3, .loop
 	lwt r1, 0		; all bytes equal
 	ujs .exit
-.diff:
-	lw r2, r2+r3		; r2 = address of s2[i]
+.bdiff:
+	aw r2, r3		; r2 = address of s2[i]
+.diff:				; r5 = s1[i], r2 = address of s2[i]
 	lwt r1, 0
 	lb r1, r2		; r1 = s2[i]
 	sw r5, r1		; r5 = s1[i] - s2[i]
 	lw r1, r5
 .exit:
+	tw r6, 1+r7
 	tw r5, r7
-	awt r7, 1
+	awt r7, 2
 	uj r4

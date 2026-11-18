@@ -105,9 +105,11 @@ i64 __moddi3(i64 n, i64 d) {
   return isneg(n) ? neg(r) : r;
 }
 
-u64 __ashldi3(u64 a, int n) {
+/* The count is a 32-bit value (long), as the compiler passes it; 64 or more
+   gives 0 (all sign bits for the arithmetic shift). */
+u64 __ashldi3(u64 a, long n) {
   pair x = split(a);
-  if (n >= 64)
+  if ((unsigned long)n >= 64)
     return 0;
   if (n >= 32) {
     x.hi = x.lo << (n - 32);
@@ -119,9 +121,9 @@ u64 __ashldi3(u64 a, int n) {
   return join(x);
 }
 
-u64 __lshrdi3(u64 a, int n) {
+u64 __lshrdi3(u64 a, long n) {
   pair x = split(a);
-  if (n >= 64)
+  if ((unsigned long)n >= 64)
     return 0;
   if (n >= 32) {
     x.lo = x.hi >> (n - 32);
@@ -133,10 +135,10 @@ u64 __lshrdi3(u64 a, int n) {
   return join(x);
 }
 
-i64 __ashrdi3(i64 a, int n) {
+i64 __ashrdi3(i64 a, long n) {
   pair x = split((u64)a);
   long fill = (long)x.hi < 0 ? -1L : 0;
-  if (n >= 64) {
+  if ((unsigned long)n >= 64) {
     x.hi = x.lo = (u32)fill;
   } else if (n >= 32) {
     x.lo = (u32)((long)x.hi >> (n - 32));

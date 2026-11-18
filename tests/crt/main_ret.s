@@ -23,9 +23,17 @@ main:
 .ok:
 	lwt r1, 1
 	rw r1, counter
+.ifdef MERA400_LARGE
+	lw r2, text_bytes	; word address of the string...
+	aw r2, r2		; ...times two = byte address (low word)
+	lwt r1, 0		; high word of the 32-bit pointer
+	rj r4, strlen
+	lw r1, r2		; size_t is 32 bits: the length is in r2
+.else
 	lw r1, text_bytes	; word address of the string...
 	aw r1, r1		; ...times two = byte address
 	rj r4, strlen
+.endif
 	awt r1, 42
 	tw r4, r7
 	awt r7, 1

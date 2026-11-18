@@ -151,7 +151,7 @@ def div(a, b):
         else:
             q |= BIT40
         rem = s64(rem << 1)
-    m = -q if neg else q
+    m = s64(-q) if neg else q
     return pack(*norm(m, e))
 
 

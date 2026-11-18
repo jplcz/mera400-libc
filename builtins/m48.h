@@ -51,38 +51,13 @@ typedef struct {
 #define M48_BIT0 ((i64)0x8000000000000000ULL)
 #define M48_BIT40 ((i64)0x800000)
 
-/* Shifts of a 64-bit value by a variable count. Clang's own expansion of a
-   variable 64-bit shift is broken (see README.md, "Compiler bugs"), so
-   the count is consumed in steps of constant shifts. */
-static inline i64 m48_sar(i64 v, int n) {
-  for (; n >= 16; n -= 16)
-    v >>= 16;
-  for (; n >= 4; n -= 4)
-    v >>= 4;
-  for (; n > 0; --n)
-    v >>= 1;
-  return v;
-}
+/* Shifts of a 64-bit value by a variable count (the compiler calls
+   __ashrdi3, __lshrdi3 and __ashldi3 from di3.c for them). */
+static inline i64 m48_sar(i64 v, int n) { return v >> n; }
 
-static inline u64 m48_shr(u64 v, int n) {
-  for (; n >= 16; n -= 16)
-    v >>= 16;
-  for (; n >= 4; n -= 4)
-    v >>= 4;
-  for (; n > 0; --n)
-    v >>= 1;
-  return v;
-}
+static inline u64 m48_shr(u64 v, int n) { return v >> n; }
 
-static inline u64 m48_shl(u64 v, int n) {
-  for (; n >= 16; n -= 16)
-    v <<= 16;
-  for (; n >= 4; n -= 4)
-    v <<= 4;
-  for (; n > 0; --n)
-    v <<= 1;
-  return v;
-}
+static inline u64 m48_shl(u64 v, int n) { return v << n; }
 
 /* True when the two top bits differ (the normalised form). */
 static inline int m48_normalised(i64 m) { return ((m ^ (m << 1)) & M48_BIT0) != 0; }
@@ -112,11 +87,8 @@ static inline m48 m48_unpack(double d) {
   return x;
 }
 
-/* The result goes through a volatile object: the compiler folds a double
-   made of constant words as if it were IEEE (a known limitation of the
-   compiler, see README.md), and that would break the saturated results. */
 static inline double m48_pack(m48 x) {
-  volatile m48_bits b;
+  m48_bits b;
   if (x.m != 0 && x.e > 127) {
     x.m = x.m < 0 ? (i64)0x8000000001000000ULL : (i64)0x7FFFFFFFFF000000ULL;
     x.e = 127;

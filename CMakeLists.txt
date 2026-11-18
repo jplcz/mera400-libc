@@ -54,6 +54,7 @@ if(NOT MERA400_BUILD_C STREQUAL "OFF")
     set(_hint HINTS "${LLVM_BIN_DIR}" NO_DEFAULT_PATH)
   endif()
   find_program(MERA400_CLANG clang ${_hint})
+  find_program(MERA400_CLANGXX clang++ ${_hint})
   set(_have_target OFF)
   if(MERA400_CLANG)
     execute_process(COMMAND "${MERA400_CLANG}" --print-targets
@@ -88,6 +89,14 @@ set(MERA400_STRING_SOURCES
   src/string/strchr.s src/string/strcmp.s src/string/strcpy.s
   src/string/strlen.s src/string/strncat.s src/string/strncmp.s
   src/string/strncpy.s src/string/strrchr.s)
+if(MERA400_MODEL STREQUAL "large")
+  # The assembly versions use 16-bit byte pointers (small model only).
+  if(NOT MERA400_BUILD_C STREQUAL "OFF" AND MERA400_CLANG)
+    set(MERA400_STRING_SOURCES src/string/large/string.c)
+  else()
+    message(FATAL_ERROR "The large memory model needs the C compiler")
+  endif()
+endif()
 
 set(MERA400_BUILTINS_SOURCES
   builtins/ashlhi3.s builtins/ashrhi3.s builtins/lshrhi3.s builtins/mulhi3.s
@@ -97,7 +106,11 @@ set(MERA400_BUILTINS_SOURCES
 set(MERA400_C_SOURCES)
 if(MERA400_C_ENABLED)
   file(GLOB MERA400_C_SOURCES CONFIGURE_DEPENDS
-       src/ctype/*.c src/stdlib/*.c src/string/*.c)
+       src/ctype/*.c src/stdlib/*.c src/string/*.c src/stdio/*.c src/math/*.c)
+  if(MERA400_PLATFORM STREQUAL "crook")
+    # libcrook provides the console hooks, putchar, puts and getchar.
+    list(FILTER MERA400_C_SOURCES EXCLUDE REGEX "src/stdio/(console|putchar)\\.c$")
+  endif()
 endif()
 
 set(MERA400_BUILTINS_C_SOURCES)
@@ -113,12 +126,25 @@ endif()
 
 mera400_add_library(c SOURCES ${MERA400_STRING_SOURCES} src/stdlib/exit.s
                     ${MERA400_C_SOURCES})
+# Only for tests: the string routines and the start/exit code, small enough
+# to be linked as a whole into one image (the complete libc is not).
+set(MERA400_CSTRING_C_SOURCES)
+if(MERA400_C_ENABLED)
+  file(GLOB MERA400_CSTRING_C_SOURCES CONFIGURE_DEPENDS src/string/*.c)
+endif()
+mera400_add_library(cstring SOURCES ${MERA400_STRING_SOURCES} src/stdlib/exit.s
+                    ${MERA400_CSTRING_C_SOURCES})
 mera400_add_library(builtins SOURCES ${MERA400_BUILTINS_SOURCES}
                     ${MERA400_BUILTINS_C_SOURCES})
 
 # The platform layer is a separate library (libcrook.a) plus its own start-up
 # object, so the bare-metal libc and its tests are the same on every platform.
 if(MERA400_PLATFORM STREQUAL "crook")
+  if(MERA400_MODEL STREQUAL "large")
+    message(FATAL_ERROR
+      "MERA400_PLATFORM=crook supports only MERA400_MODEL=small: CROOK programs "
+      "live in one 64 K-word address space")
+  endif()
   include(crook)
 endif()
 
@@ -128,10 +154,16 @@ endif()
 # directory with this layout is all a user needs to compile and link programs
 # with the plain compiler command.
 install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
-install(FILES "${_crt0_obj}" crt/mera400.ld DESTINATION lib)
+# The large model goes to lib/large so both can share one sysroot.
+if(MERA400_MODEL STREQUAL "large")
+  set(_libdir lib/large)
+else()
+  set(_libdir lib)
+endif()
+install(FILES "${_crt0_obj}" crt/mera400.ld DESTINATION ${_libdir})
 get_target_property(_libc_a c MERA400_ARCHIVE)
 get_target_property(_builtins_a builtins MERA400_ARCHIVE)
-install(FILES "${_libc_a}" "${_builtins_a}" DESTINATION lib)
+install(FILES "${_libc_a}" "${_builtins_a}" DESTINATION ${_libdir})
 
 # --- Tests ------------------------------------------------------------------
 include(CTest)

@@ -89,7 +89,19 @@ int main(void) {
     /* Everything is free again, so one big block is available. */
     p[0] = malloc(30000);
     CHECK(p[0] != NULL);
+#ifdef __MERA400_LARGE__
+    /* The large model's heap exceeds 64 KiB and sizes are 32 bits wide. */
+    {
+      char *big = malloc(70000UL);
+      CHECK(big != NULL);
+      big[69999] = 7;
+      big[0] = 1;
+      CHECK(big[69999] == 7 && big[0] == 1);
+      free(big);
+    }
+#else
     CHECK(malloc(40000) == NULL);
+#endif
     free(p[0]);
     p[0] = calloc(10, 10);
     for (j = 0; j < 100; ++j)

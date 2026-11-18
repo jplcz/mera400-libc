@@ -32,43 +32,108 @@ function(_add_test_image name lib entry)
   endif()
   add_custom_command(
     OUTPUT "${_elf}"
-    COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_LINKER_SCRIPT}"
-            --whole-archive "${_a}" ${_more} -e ${entry} -o "${_elf}"
+    COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_LINK_DEFSYMS}
+            -T "${MERA400_LINKER_SCRIPT}" --whole-archive "${_a}" ${_more}
+            -e ${entry} -o "${_elf}"
     DEPENDS ${lib} ${_more_deps} "${_a}" "${MERA400_LINKER_SCRIPT}"
     COMMENT "Linking ${name}.elf"
     VERBATIM)
   add_custom_target(${name} ALL DEPENDS "${_elf}")
 endfunction()
 
-_add_test_image(string_image c memcpy WITH_RUNTIME)
+_add_test_image(string_image cstring memcpy WITH_RUNTIME)
 _add_test_image(builtins_image builtins __mulhi3)
 
 set(_py ${Python3_EXECUTABLE})
+add_subdirectory(abi)
 
-add_test(NAME string COMMAND ${_py} ${SIM}/test_string.py string_image.elf)
+if(MERA400_MODEL STREQUAL "small")
+  add_test(NAME string COMMAND ${_py} ${SIM}/test_string.py string_image.elf)
+else()
+  # The large model's C string routines, called with its calling convention.
+  add_test(NAME string COMMAND ${_py} ${SIM}/test_string.py string_image.elf --large)
+endif()
+set_tests_properties(string PROPERTIES WORKING_DIRECTORY
+                     "${CMAKE_CURRENT_BINARY_DIR}")
 add_test(NAME builtins COMMAND ${_py} ${SIM}/test_builtins.py builtins_image.elf)
+add_test(NAME int-helpers COMMAND ${_py} ${SIM}/test_int.py builtins_image.elf
+         $<$<STREQUAL:${MERA400_MODEL},large>:--large>)
+add_test(NAME m48-float COMMAND ${_py} ${SIM}/test_m48.py builtins_image.elf)
 add_test(NAME crt0 COMMAND ${_py} ${SIM}/test_crt.py crt_test.elf crt_test.bin)
 if(MERA400_C_ENABLED)
   mera400_add_executable(c_test SOURCES c/test_c.c LIBRARIES c builtins)
   add_test(NAME c-on-target COMMAND ${_py} ${SIM}/test_c.py c_test.elf)
   set_tests_properties(c-on-target PROPERTIES WORKING_DIRECTORY
                        "${CMAKE_CURRENT_BINARY_DIR}")
+  if(MERA400_PLATFORM STREQUAL "none")
+    mera400_add_executable(mem_test SOURCES c/test_mem.c LIBRARIES c builtins
+                           COMPILE_OPTIONS -Wno-pointer-sign)
+    add_test(NAME mem-on-target COMMAND ${_py} ${SIM}/test_c.py mem_test.elf)
+    set_tests_properties(mem-on-target PROPERTIES WORKING_DIRECTORY
+                         "${CMAKE_CURRENT_BINARY_DIR}")
+    mera400_add_executable(stdio_test SOURCES c/test_stdio.c LIBRARIES c builtins)
+    add_test(NAME stdio COMMAND ${_py} ${SIM}/test_stdio.py stdio_test.elf
+                                ${MERA400_MODEL})
+    mera400_add_executable(math_test SOURCES c/test_math.c LIBRARIES c builtins)
+    add_test(NAME math COMMAND ${_py} ${SIM}/test_math.py math_test.elf
+                               ${MERA400_MODEL})
+
+    # Start-up and exit: constructors, main, atexit handlers, destructors.
+    mera400_add_executable(init_test SOURCES c/test_init.c LIBRARIES c builtins)
+    add_test(NAME init COMMAND ${_py} ${SIM}/test_init.py init_test.elf
+                               abcmk21xy 77 3 ${MERA400_MODEL})
+    mera400_add_executable(init_abort_test SOURCES c/test_init.c
+                           COMPILE_OPTIONS -DTEST_ABORT
+                           LIBRARIES c builtins)
+    add_test(NAME init-abort COMMAND ${_py} ${SIM}/test_init.py init_abort_test.elf
+                                     abcmk 40 -1 ${MERA400_MODEL})
+    if(MERA400_CLANGXX)
+      mera400_add_executable(init_cpp_test SOURCES c/test_init_cpp.cpp
+                             LIBRARIES c builtins)
+      add_test(NAME init-cpp COMMAND ${_py} ${SIM}/test_init.py init_cpp_test.elf
+                                     ABmba 77 0 ${MERA400_MODEL})
+      if(MERA400_MODEL STREQUAL "large")
+        # Compiler bug: the destructor guard (a 1-byte global) is stored
+        # with "rb r, symbol" using the symbol's WORD address as a byte
+        # address (see tests/README.md). Expected to fail until Clang is fixed.
+        set_tests_properties(init-cpp PROPERTIES WILL_FAIL TRUE)
+      endif()
+    endif()
+  endif()
 endif()
 add_test(NAME decoder-vs-objdump
          COMMAND ${_py} ${SIM}/test_decode.py "${MERA400_LLVM_OBJDUMP}"
                  string_image.elf builtins_image.elf crt_test.elf)
 
+# --gc-sections: crt_test only calls strlen, so no other string/helper code
+# may be in the image.
+get_filename_component(_llvm_bin "${MERA400_LLVM_OBJDUMP}" DIRECTORY)
+find_program(MERA400_LLVM_NM llvm-nm HINTS "${_llvm_bin}" NO_DEFAULT_PATH)
+if(MERA400_LLVM_NM)
+  add_test(NAME gc-sections
+           COMMAND ${_py} ${SIM}/test_gc.py "${MERA400_LLVM_NM}" crt_test.elf
+                   main,strlen,_start,exit
+                   strcpy,strcmp,memcpy,memmove,memset,strncpy,__mulhi3,__divhi3,atexit)
+endif()
+
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/link-orders")
+# strlen is its own object (strlen.s) in the small model; the large model's
+# string routines are all in string.c.
+if(MERA400_MODEL STREQUAL "large")
+  set(_strlen_obj "${CMAKE_CURRENT_BINARY_DIR}/../c.dir/string.o")
+else()
+  set(_strlen_obj "${CMAKE_CURRENT_BINARY_DIR}/../c.dir/strlen.o")
+endif()
 add_test(NAME start-first
          COMMAND ${_py} ${SIM}/test_start_first.py "${MERA400_LD_LLD}"
                  "${MERA400_LINKER_SCRIPT}" "${CMAKE_CURRENT_BINARY_DIR}/link-orders"
                  "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>"
                  "${CMAKE_CURRENT_BINARY_DIR}/crt_test.dir/main_ret.o"
-                 "${CMAKE_CURRENT_BINARY_DIR}/../c.dir/strlen.o"
+                 "${_strlen_obj}"
                  "${CMAKE_CURRENT_BINARY_DIR}/../builtins.dir/mulhi3.o"
                  "${MERA400_LIB_DIR}/libc.a"
                  "${MERA400_LIB_DIR}/libbuiltins.a")
-set_tests_properties(string builtins crt0 decoder-vs-objdump start-first
+set_tests_properties(builtins crt0 decoder-vs-objdump start-first
                      PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
 # The portable C sources cannot run on the target without a compiler for it,

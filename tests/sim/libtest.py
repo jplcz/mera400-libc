@@ -36,6 +36,33 @@ class LoggedMem(list):
         super().__setitem__(i, v)
 
 
+class ConsoleMem(list):
+    """Word memory with a memory-mapped console word (see
+    src/stdio/console.c): a write appends the low octet to `output`, a read
+    returns the next byte of `input_data` or 0xFFFF at its end."""
+
+    def __init__(self, items, port_word, input_data=b""):
+        super().__init__(items)
+        self.port = port_word
+        self.output = bytearray()
+        self.input_data = bytes(input_data)
+        self.in_pos = 0
+
+    def __setitem__(self, i, v):
+        if i == self.port:
+            self.output.append(v & 0xFF)
+        else:
+            super().__setitem__(i, v)
+
+    def __getitem__(self, i):
+        if i == self.port:
+            if self.in_pos < len(self.input_data):
+                self.in_pos += 1
+                return self.input_data[self.in_pos - 1]
+            return 0xFFFF
+        return super().__getitem__(i)
+
+
 class Checker:
     def __init__(self, name):
         self.name = name

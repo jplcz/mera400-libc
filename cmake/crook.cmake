@@ -49,9 +49,9 @@ math(EXPR _crook_base_bytes "${MERA400_CROOK_BASE} * 2")
 math(EXPR _crook_size_bytes "${MERA400_CROOK_IMAGE_WORDS} * 2")
 math(EXPR _crook_stack_bytes "${MERA400_CROOK_STACK_WORDS} * 2")
 set(MERA400_CROOK_DEFSYMS
-    "--defsym=__arg_image_base=${_crook_base_bytes}"
-    "--defsym=__arg_image_size=${_crook_size_bytes}"
-    "--defsym=__arg_stack_size=${_crook_stack_bytes}"
+    "--defsym=__image_base=${_crook_base_bytes}"
+    "--defsym=__image_size=${_crook_size_bytes}"
+    "--defsym=__stack_size=${_crook_stack_bytes}"
     CACHE INTERNAL "")
 
 set(_hint)
@@ -69,7 +69,8 @@ endif()
 # and its start-up object crt0_crook (not in the archive, linked first).
 mera400_add_library(crook SOURCES
   src/crook/exit.s src/crook/exl.s src/crook/fil.s src/crook/rec.s
-  src/crook/block.s src/crook/value.s src/crook/convert.s src/crook/stdio.s)
+  src/crook/block.s src/crook/value.s src/crook/convert.s src/crook/stdio.s
+  src/crook/stdout.c)
 _mera400_object(_crt0_crook_obj "crt/crt0-crook.s" crt0_crook)
 add_custom_target(crt0_crook ALL DEPENDS "${_crt0_crook_obj}")
 set_property(TARGET crt0_crook PROPERTY MERA400_OBJECT "${_crt0_crook_obj}")
@@ -96,9 +97,8 @@ function(crook_add_executable name)
   # crt0-crook.o is deliberately the first input.
   add_custom_command(
     OUTPUT "${_elf}"
-    COMMAND "${MERA400_LD_LLD}" -m mera400elf -T "${MERA400_CROOK_LINKER_SCRIPT}"
-            --gc-sections
-            ${MERA400_CROOK_DEFSYMS} ${ARG_LINK_OPTIONS}
+    COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_CROOK_DEFSYMS} ${ARG_LINK_OPTIONS}
+            -T "${MERA400_CROOK_LINKER_SCRIPT}" --gc-sections
             "$<TARGET_PROPERTY:crt0_crook,MERA400_OBJECT>" ${_objs} ${_libs}
             -o "${_elf}"
     DEPENDS ${_objs} ${_libs} ${_deps} crt0_crook "${MERA400_CROOK_LINKER_SCRIPT}"

@@ -21,7 +21,12 @@ Edge cases are noted at the top of each file.
 | `__ashlsi3` `__lshrsi3` `__ashrsi3` | 32-bit shifts by a variable count (the count is a 32-bit value, as the compiler passes it) | done, in C |
 | `__mulsi3` | 32-bit multiplication | done, in C |
 | `__udivsi3` `__umodsi3` `__divsi3` `__modsi3` | 32-bit divide / remainder | done, in C |
-| `*di3` (64-bit) | | not started |
+| `*di3` (64-bit) `__mulodi4` `__mulosi4`... | 64-bit multiply, divide, remainder, shifts | done, in C (`di3.c`) |
+| `__m48_add sub mul div neg cmp` and conversions, `powi` | floating point on the native 48-bit format (3 words: 39-bit magnitude mantissa, 8-bit exponent), in software; the compiler calls them for every `float`/`double` operation | done, in C (`m48_*.c`) |
+
+The float helpers are checked against a Python model (`tests/sim/m48ref.py`).
+Overflow saturates to the largest value, underflow gives 0. The variant that
+would use the hardware AWP (floating point) instructions is not implemented.
 
 `udivmodhi.s` holds the shared internal routine `__udivmodhi` (quotient in
 `R1`, remainder in `R2`) that the four division helpers use.

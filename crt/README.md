@@ -11,14 +11,20 @@ word of the program image; that word is `_start`, which:
    "finished OK" stop). `abort` stops with `hlt 040`.
 
 The code lives in the section `.text.crt0` so that the linker script can
-put it first whatever the link order (see the top-level README).
+put it first whatever the link order (see the top-level README). Before
+`main`, crt0 runs `__libc_init_array` (the `.preinit_array` and `.init_array`
+tables: C++ static constructors and `__attribute__((constructor))`); `exit`
+runs the `atexit` functions, then the `.fini_array` destructors. In the
+large model the tables hold 4-byte byte addresses (function pointers are
+32 bits there); in the small model 2-byte word addresses. The linker script
+marks them `KEEP` so `--gc-sections` does not drop them.
 
 **mera400.ld** is the *linker script*: it tells `ld.lld` where things go.
 All addresses in it are **byte** addresses (word address × 2):
 
 * `__image_base` (default `0x400`): where the image is loaded. Override with
   `--defsym=__image_base=...`.
-* `__stack_top` (default `0x10000`) and `__stack_size` (default `0x400`):
+* `__stack_top` (default `0xFFFE`; the large model passes `0x1FFFE`) and `__stack_size` (default `0x400`):
   the stack grows down from `__stack_top`; the heap used by `malloc`
   (`__heap_start`..`__heap_end`) fills the space between the end of `.bss`
   and the reserved stack area.
