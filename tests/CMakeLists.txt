@@ -92,12 +92,6 @@ if(MERA400_C_ENABLED)
                              LIBRARIES c builtins)
       add_test(NAME init-cpp COMMAND ${_py} ${SIM}/test_init.py init_cpp_test.elf
                                      ABmba 77 0 ${MERA400_MODEL})
-      if(MERA400_MODEL STREQUAL "large")
-        # Compiler bug: the destructor guard (a 1-byte global) is stored
-        # with "rb r, symbol" using the symbol's WORD address as a byte
-        # address (see tests/README.md). Expected to fail until Clang is fixed.
-        set_tests_properties(init-cpp PROPERTIES WILL_FAIL TRUE)
-      endif()
     endif()
   endif()
 endif()

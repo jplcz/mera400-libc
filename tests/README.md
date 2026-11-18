@@ -13,7 +13,7 @@ level README). Some tests exist only in some configurations.
 | `c-on-target` | the portable C code (`qsort`, `malloc`, ...) compiled by Clang and run on the simulator |
 | `stdio` | `printf`, `sprintf`, `snprintf`, `sscanf` and the console hook on the simulator |
 | `math` | the `math.h` functions against Python's `math` within an accuracy bound |
-| `init`, `init-abort`, `init-cpp` | constructors (with priorities), destructors, `atexit` order, `exit` and `abort`; the C++ variant uses `clang++` static objects. In the large model `init-cpp` is an expected failure (`WILL_FAIL`): Clang stores the 1-byte destructor guard with `rb r, symbol`, using the symbol's word address as a byte address (repro: `static _Bool f; void set(void){f=1;} _Bool get(void){return f;}` with `-mlarge-memory`) |
+| `init`, `init-abort`, `init-cpp` | constructors (with priorities), destructors, `atexit` order, `exit` and `abort`; the C++ variant uses `clang++` static objects. It checks the 1-byte destructor guard too, in both models. |
 | `crt0` | start-up: stack, `.bss` cleared from junk, `main` result, final `hlt` |
 | `decoder-vs-objdump` | the simulator decodes every instruction like `llvm-objdump` |
 | `start-first` | `_start` is at the image start for every position of crt0 on the link line |
