@@ -16,10 +16,39 @@ add_test(NAME crook
 set_tests_properties(crook PROPERTIES
                      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
+# A program links from the INSTALLED sysroot with no -L: install into the build
+# tree, then run the plain driver command and the same fake-CROOK test on the
+# result.
+if(MERA400_CROOK_DRIVER)
+  set(_sysroot "${CMAKE_CURRENT_BINARY_DIR}/sysroot")
+  add_test(NAME crook-install
+           COMMAND ${CMAKE_COMMAND} --install "${CMAKE_BINARY_DIR}" --prefix "${_sysroot}")
+  add_test(NAME crook-sysroot-link
+           COMMAND ${MERA400_CLANG} --target=${MERA400_TRIPLE} --sysroot=${_sysroot}
+                   ${CMAKE_CURRENT_SOURCE_DIR}/crook_main.s
+                   -o ${CMAKE_CURRENT_BINARY_DIR}/sysroot_test.bin)
+  add_test(NAME crook-sysroot-image
+           COMMAND ${CMAKE_COMMAND} -E compare_files
+                   ${CMAKE_CURRENT_BINARY_DIR}/sysroot_test.bin
+                   ${CMAKE_CURRENT_BINARY_DIR}/crook_test.bin)
+  set_tests_properties(crook-install PROPERTIES FIXTURES_SETUP crook_sysroot)
+  set_tests_properties(crook-sysroot-link PROPERTIES FIXTURES_SETUP crook_sysroot_bin
+                       FIXTURES_REQUIRED crook_sysroot)
+  set_tests_properties(crook-sysroot-image PROPERTIES FIXTURES_REQUIRED crook_sysroot_bin)
+endif()
+
+# The raw image can be turned into ASSM text and back without loss.
+add_test(NAME image2assm-crook-image
+         COMMAND ${Python3_EXECUTABLE} -B
+                 ${CMAKE_CURRENT_SOURCE_DIR}/../tools/test_image2assm.py
+                 crook_test.bin)
+set_tests_properties(image2assm-crook-image PROPERTIES
+                     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+
 # printf, puts and fflush through the portable stdio and libcrook's hooks.
 if(MERA400_C_ENABLED)
   crook_add_executable(crook_printf SOURCES crook_printf.c
-                       LINK_OPTIONS --defsym=__image_size=49152)
+                       IMAGE_WORDS 24576)
   add_test(NAME crook-stdio
            COMMAND ${Python3_EXECUTABLE}
                    ${CMAKE_CURRENT_SOURCE_DIR}/test_crook_stdio.py crook_printf.elf)

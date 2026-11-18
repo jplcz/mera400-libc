@@ -104,6 +104,9 @@ Options:
 | `MERA400_PLATFORM` | `none` (default, bare metal) or `crook` (also builds `libcrook.a`, `crt0_crook`, the CROOK test; see "CROOK platform") |
 | `MERA400_CROOK_BASE`, `MERA400_CROOK_IMAGE_WORDS`, `MERA400_CROOK_STACK_WORDS` | crook only: load address, image size and stack size, all in 16-bit words (defaults 0, 8192, 512) |
 
+The CROOK configuration also needs Python 3 for `tools/image2assm.py` (see
+"CROOK platform").
+
 VS Code users: `.vscode/tasks.json` has configure, build and test tasks for
 all three configurations (small, large, CROOK) and `.vscode/launch.json` can
 debug the Python simulator tests.
@@ -152,8 +155,11 @@ octal) whose argument goes in register R4, and leaves with the **XOSL**
 extracodes `END` (0373) or `EOSL` (0377). CROOK gives a program no stack, so
 our start-up code makes one.
 
-Build for it (the triple `mera400-unknown-crook` does not exist in LLVM yet,
-so the code is assembled for `mera400-unknown-none`):
+Build for it. With a Clang that knows the target `mera400-unknown-crook` (the
+one in this LLVM tree) everything is compiled for that triple, which also
+defines `__CROOK__`, and the Clang driver links the program by itself; with an
+older Clang the code is built for `mera400-unknown-none` (the machine code is
+identical) and `ld.lld` is called directly.
 
 ```sh
 cmake -S . -B build-crook -DCMAKE_TOOLCHAIN_FILE=cmake/mera400-toolchain.cmake \
@@ -170,6 +176,32 @@ wrappers, `putchar puts getchar`, text conversion; reference in
 Make a program with `crook_add_executable(name SOURCES ... )`: it links
 `crt0_crook` first and runs `llvm-objcopy -O binary` to get `name.bin`.
 
+**Linking by hand with the Clang driver.** The driver looks for `crt0-crook.o`,
+`crook.ld`, `libcrook.a`, `libc.a` and `libbuiltins.a` in `-L` directories and
+in `<sysroot>/lib`. `cmake --install <build> --prefix <sysroot>` in a CROOK
+configuration installs all of them (`crt0-crook.o`, `crook.ld`, `libcrook.a`
+next to `libc.a` and `libbuiltins.a`), so with the installed sysroot no `-L`
+is needed:
+
+```sh
+clang --target=mera400-unknown-crook --sysroot=<sysroot> hello.c -o hello.bin
+```
+
+From a build tree without installing, point `-L` at it:
+
+```sh
+B=build-crook      # the build directory
+clang --target=mera400-unknown-crook -O2 -c hello.c -isystem include -nostdlibinc -ffreestanding
+clang --target=mera400-unknown-crook -L$B/crt0_crook.dir -Lcrt -L$B/lib/small \
+      -mcrook-base=0 -mcrook-image=8192 -mcrook-stack=512 hello.o -o hello.bin
+```
+
+The driver links `crt0-crook.o`, your objects, `libcrook.a`, `libc.a` and
+`libbuiltins.a` with `crook.ld` and `--gc-sections`. The three `-mcrook-*`
+options count **words** (defaults 0, 8192, 512) and become the linker symbols
+`__image_base`, `__image_size`, `__stack_size` (in bytes). An output file name
+ending in `.bin` gives the raw image instead of an ELF file.
+
 **The image.** `name.bin` is a sequence of 16-bit words, each stored high
 byte first (big-endian), so the file is *twice as many bytes as words*
 (default: 8192 words = 16384 bytes). The first word is crt0. The file is
@@ -178,6 +210,53 @@ by the highest address in the file, so the padding is the program's `.bss`,
 heap and stack (stack at the top, growing down). Linker scripts count bytes,
 CMake options count words; `cmake/crook.cmake` converts. With base 0 a NULL
 pointer equals the start of the code.
+
+### Getting the image onto CROOK: `tools/image2assm.py`
+
+*Why.* CROOK has no loader. Its assembler, **ASSM** (the MERA-400 assembler
+that comes with CROOK), writes a program straight into a disk file, and the
+byte layout of such a file is not documented. A host tool that wrote the file
+itself would have to guess. So instead we hand ASSM what it understands: the
+image as ASSM **source text** (a file header, a memory size and every word as
+a number). You copy that text to CROOK (type it in with CROOK's editor, or
+transfer it by a DOS floppy) and assemble it there; ASSM, not us, decides the
+on-disk layout.
+
+*How.* The input is the flat big-endian word image (`name.bin`):
+
+```sh
+python3 tools/image2assm.py hello.bin --title HELLO -o hello.asm
+python3 tools/image2assm.py hello.bin --title HELLO --base 0 --attr 050 \
+        --mem-quanta 2 --eol cr -o hello.asm
+```
+
+Options: `--title` (the CROOK file name), `--type` (file type, octal, 0),
+`--base` (word address of the first word, 0), `--attr` (program attribute,
+octal, 050 = ASSM's default), `--mem-quanta` (memory size in 4K-word blocks;
+default: just enough), `--eol cr` (CROOK ends lines with CR), `--no-res`
+(write zero words one by one), `--prog-block` (wrap in `PROG*`/`FINPROG*`).
+The output looks like
+
+```
+FILE*HELLO,0,0,050.
+MEM* 017777.
+S* 0.
+0071007. 0000000. ...
+RES* 7900.
+```
+
+`FILE*` names the file and gives type, base address and attribute, `MEM*` the
+largest address the program may use, `S*` the address of the next word, a
+number ended by a full stop is one word (a leading 0 means octal) and
+`RES* n.` is *n* zero words. All of these are documented on the ASSM page
+<https://mera400.pl/J%C4%99zyk_symboliczny_(assembler)_ASSM>. **Not verified**
+(see the comment at the top of the tool): the characters allowed in a title,
+the meaning of the type, whether ASSM needs `PROG*`/`FINPROG*`, how `MEM*`
+relates to the memory *quanta* in the file label (`--mem-quanta N` writes
+`N*4096-1`, a guess), and where CROOK starts the program. The CTest
+`image2assm` (and `image2assm-crook-image` with a real image) checks that
+image → text → words gives the original back; it cannot check that ASSM
+accepts the text.
 
 **Text.** C strings (one char per byte, NUL-terminated) already have CROOK's
 packing (two chars per word, high byte first). CROOK ends lines with CR, so

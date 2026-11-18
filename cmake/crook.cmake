@@ -16,9 +16,15 @@
 #                words. The first word is the first instruction of crt0.
 #
 #   crook_add_executable(<name> SOURCES <files...> [LIBRARIES <libs...>]
-#                        [LINK_OPTIONS <options...>])
+#                        [LINK_OPTIONS <options...>] [BASE <words>]
+#                        [IMAGE_WORDS <words>] [STACK_WORDS <words>])
 #       Links <name>.elf with crt0_crook FIRST, crook.ld and the libraries
-#       (default: c builtins crook), then <name>.bin with llvm-objcopy -O binary.
+#       (default: crook c builtins), then <name>.bin with llvm-objcopy -O binary.
+#       With a clang that knows mera400-unknown-crook the link is done by
+#       the clang driver (-mcrook-base/-image/-stack, which it turns into
+#       --defsym options placed before -T); otherwise by ld.lld directly.
+#       BASE, IMAGE_WORDS and STACK_WORDS override the cache variables below
+#       for one program.
 #
 # Configuration (cache variables, all in WORDS, not bytes):
 #   MERA400_CROOK_BASE         address of the first word of the image (0)
@@ -45,15 +51,6 @@ set(MERA400_CROOK_LINKER_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../crt/crook.ld"
 set(MERA400_CROOK_INCLUDE_DIR "${CMAKE_CURRENT_LIST_DIR}/../src/crook/include"
     CACHE INTERNAL "")
 
-math(EXPR _crook_base_bytes "${MERA400_CROOK_BASE} * 2")
-math(EXPR _crook_size_bytes "${MERA400_CROOK_IMAGE_WORDS} * 2")
-math(EXPR _crook_stack_bytes "${MERA400_CROOK_STACK_WORDS} * 2")
-set(MERA400_CROOK_DEFSYMS
-    "--defsym=__image_base=${_crook_base_bytes}"
-    "--defsym=__image_size=${_crook_size_bytes}"
-    "--defsym=__stack_size=${_crook_stack_bytes}"
-    CACHE INTERNAL "")
-
 set(_hint)
 if(LLVM_BIN_DIR)
   set(_hint HINTS "${LLVM_BIN_DIR}" NO_DEFAULT_PATH)
@@ -76,9 +73,18 @@ add_custom_target(crt0_crook ALL DEPENDS "${_crt0_crook_obj}")
 set_property(TARGET crt0_crook PROPERTY MERA400_OBJECT "${_crt0_crook_obj}")
 
 function(crook_add_executable name)
-  cmake_parse_arguments(ARG "" "" "SOURCES;LIBRARIES;LINK_OPTIONS" ${ARGN})
+  cmake_parse_arguments(ARG "" "BASE;IMAGE_WORDS;STACK_WORDS"
+                        "SOURCES;LIBRARIES;LINK_OPTIONS" ${ARGN})
+  # Per-program overrides of the cache variables (all in words).
+  foreach(_v BASE IMAGE_WORDS STACK_WORDS)
+    if("${ARG_${_v}}" STREQUAL "")
+      set(ARG_${_v} "${MERA400_CROOK_${_v}}")
+    endif()
+  endforeach()
+  set(_default_libs OFF)
   if(NOT ARG_LIBRARIES)
-    set(ARG_LIBRARIES c builtins crook)
+    set(ARG_LIBRARIES crook c builtins)
+    set(_default_libs ON)
   endif()
   set(_objs)
   foreach(_src ${ARG_SOURCES})
@@ -92,18 +98,51 @@ function(crook_add_executable name)
     list(APPEND _libs "${_a}")
     list(APPEND _deps ${_l})
   endforeach()
+  get_target_property(_crt0 crt0_crook MERA400_OBJECT)
   set(_elf "${CMAKE_CURRENT_BINARY_DIR}/${name}.elf")
   set(_bin "${CMAKE_CURRENT_BINARY_DIR}/${name}.bin")
-  # crt0-crook.o is deliberately the first input.
-  add_custom_command(
-    OUTPUT "${_elf}"
-    COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_CROOK_DEFSYMS} ${ARG_LINK_OPTIONS}
-            -T "${MERA400_CROOK_LINKER_SCRIPT}" --gc-sections
-            "$<TARGET_PROPERTY:crt0_crook,MERA400_OBJECT>" ${_objs} ${_libs}
-            -o "${_elf}"
-    DEPENDS ${_objs} ${_libs} ${_deps} crt0_crook "${MERA400_CROOK_LINKER_SCRIPT}"
-    COMMENT "Linking ${name}.elf"
-    VERBATIM)
+
+  if(MERA400_CROOK_DRIVER AND _default_libs)
+    # The clang driver does the CROOK link: crt0-crook.o first, then the
+    # objects, crook.ld, --gc-sections, libcrook.a, libc.a, libbuiltins.a, and
+    # the image parameters (in words) before -T. It finds the start-up object,
+    # the script and the archives in the -L directories, the same layout that
+    # "cmake --install" makes in <sysroot>/lib.
+    get_filename_component(_crt0_dir "${_crt0}" DIRECTORY)
+    get_filename_component(_ld_dir "${MERA400_CROOK_LINKER_SCRIPT}" DIRECTORY)
+    set(_wl)
+    foreach(_o ${ARG_LINK_OPTIONS})
+      list(APPEND _wl "-Wl,${_o}")
+    endforeach()
+    set(_link "${MERA400_CLANG}" --target=${MERA400_TRIPLE}
+        -mcrook-base=${ARG_BASE} -mcrook-image=${ARG_IMAGE_WORDS}
+        -mcrook-stack=${ARG_STACK_WORDS}
+        -L${_crt0_dir} -L${_ld_dir} -L${MERA400_LIB_DIR} ${_wl}
+        ${_objs})
+    add_custom_command(
+      OUTPUT "${_elf}"
+      COMMAND ${_link} -o "${_elf}"
+      DEPENDS ${_objs} ${_libs} ${_deps} crt0_crook "${MERA400_CROOK_LINKER_SCRIPT}"
+      COMMENT "Linking ${name}.elf"
+      VERBATIM)
+  else()
+    # No clang that knows the CROOK triple (or a custom library list): call
+    # ld.lld directly. crt0-crook.o is deliberately the first input.
+    math(EXPR _base_b "${ARG_BASE} * 2")
+    math(EXPR _size_b "${ARG_IMAGE_WORDS} * 2")
+    math(EXPR _stack_b "${ARG_STACK_WORDS} * 2")
+    add_custom_command(
+      OUTPUT "${_elf}"
+      COMMAND "${MERA400_LD_LLD}" -m mera400elf
+              --defsym=__image_base=${_base_b} --defsym=__image_size=${_size_b}
+              --defsym=__stack_size=${_stack_b} ${ARG_LINK_OPTIONS}
+              -T "${MERA400_CROOK_LINKER_SCRIPT}" --gc-sections
+              "${_crt0}" ${_objs} ${_libs}
+              -o "${_elf}"
+      DEPENDS ${_objs} ${_libs} ${_deps} crt0_crook "${MERA400_CROOK_LINKER_SCRIPT}"
+      COMMENT "Linking ${name}.elf"
+      VERBATIM)
+  endif()
   add_custom_command(
     OUTPUT "${_bin}"
     COMMAND "${MERA400_LLVM_OBJCOPY}" -O binary "${_elf}" "${_bin}"

@@ -72,6 +72,24 @@ if(NOT MERA400_BUILD_C STREQUAL "OFF")
   endif()
 endif()
 
+# --- Target triple ----------------------------------------------------------
+# Under CROOK the sources are compiled for mera400-unknown-crook when the
+# available clang knows that triple (it then also defines __CROOK__ and its
+# driver links CROOK images by itself, see cmake/crook.cmake). Otherwise, and
+# on every other platform, the bare triple is used: the code is identical.
+set(MERA400_TRIPLE "mera400-unknown-none")
+set(MERA400_CROOK_DRIVER OFF)
+if(MERA400_PLATFORM STREQUAL "crook" AND MERA400_C_ENABLED)
+  execute_process(COMMAND "${MERA400_CLANG}" --target=mera400-unknown-crook
+                          -E -dM -x c /dev/null
+                  OUTPUT_VARIABLE _crook_macros ERROR_QUIET)
+  if(_crook_macros MATCHES "__CROOK__")
+    set(MERA400_TRIPLE "mera400-unknown-crook")
+    set(MERA400_CROOK_DRIVER ON)
+  endif()
+endif()
+message(STATUS "Target triple: ${MERA400_TRIPLE}")
+
 include(Mera400)
 mera400_check_tools()
 
@@ -164,6 +182,13 @@ install(FILES "${_crt0_obj}" crt/mera400.ld DESTINATION ${_libdir})
 get_target_property(_libc_a c MERA400_ARCHIVE)
 get_target_property(_builtins_a builtins MERA400_ARCHIVE)
 install(FILES "${_libc_a}" "${_builtins_a}" DESTINATION ${_libdir})
+# The CROOK driver finds the same layout: lib/crt0-crook.o, lib/crook.ld and
+# lib/libcrook.a next to libc.a and libbuiltins.a.
+if(MERA400_PLATFORM STREQUAL "crook")
+  get_target_property(_crook_a crook MERA400_ARCHIVE)
+  install(FILES "${_crt0_crook_obj}" "${MERA400_CROOK_LINKER_SCRIPT}" "${_crook_a}"
+          DESTINATION lib)
+endif()
 
 # --- Tests ------------------------------------------------------------------
 include(CTest)

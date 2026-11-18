@@ -35,6 +35,9 @@
 if(NOT MERA400_MODEL)
   set(MERA400_MODEL small)
 endif()
+if(NOT MERA400_TRIPLE)
+  set(MERA400_TRIPLE mera400-unknown-none)
+endif()
 set(MERA400_LIB_DIR "${CMAKE_BINARY_DIR}/lib/${MERA400_MODEL}")
 set(MERA400_CLANG_MODEL_FLAGS)
 set(MERA400_ASM_MODEL_FLAGS)
@@ -75,7 +78,7 @@ function(_mera400_object out_var source target)
     add_custom_command(
       OUTPUT "${_obj}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir"
-      COMMAND "${MERA400_LLVM_MC}" -triple=mera400-unknown-none
+      COMMAND "${MERA400_LLVM_MC}" -triple=${MERA400_TRIPLE}
               ${MERA400_ASM_MODEL_FLAGS}
               -filetype=obj "${_abs}" -o "${_obj}"
       DEPENDS "${_abs}"
@@ -94,7 +97,7 @@ function(_mera400_object out_var source target)
       # Every function and every data object gets its own section, so that
       # the linker's --gc-sections (see mera400_add_executable) can drop what
       # a program does not use: code size matters on a machine with 64K words.
-      COMMAND "${MERA400_CLANG}" --target=mera400-unknown-none -ffreestanding
+      COMMAND "${MERA400_CLANG}" --target=${MERA400_TRIPLE} -ffreestanding
               -nostdlibinc -O2 -ffunction-sections -fdata-sections
               ${MERA400_CLANG_MODEL_FLAGS} ${MERA400_COMPILE_OPTIONS}
               -isystem "${MERA400_ROOT}/include" -MD -MF "${_obj}.d"
@@ -112,7 +115,7 @@ function(_mera400_object out_var source target)
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/${target}.dir"
       # Freestanding C++: no exceptions, no run-time type information, no
       # standard library; the C headers of this library are available.
-      COMMAND "${MERA400_CLANGXX}" --target=mera400-unknown-none -ffreestanding
+      COMMAND "${MERA400_CLANGXX}" --target=${MERA400_TRIPLE} -ffreestanding
               -nostdlibinc -nostdinc++ -O2 -ffunction-sections -fdata-sections
               -fno-exceptions -fno-rtti -fno-threadsafe-statics
               ${MERA400_CLANG_MODEL_FLAGS} ${MERA400_COMPILE_OPTIONS}

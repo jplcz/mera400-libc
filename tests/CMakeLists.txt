@@ -46,6 +46,7 @@ _add_test_image(builtins_image builtins __mulhi3)
 
 set(_py ${Python3_EXECUTABLE})
 add_subdirectory(abi)
+add_subdirectory(tools)
 
 if(MERA400_MODEL STREQUAL "small")
   add_test(NAME string COMMAND ${_py} ${SIM}/test_string.py string_image.elf)

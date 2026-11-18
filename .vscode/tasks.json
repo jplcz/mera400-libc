@@ -6,6 +6,18 @@
       "type": "promptString",
       "description": "Directory with the MERA-400 enabled llvm-mc, ld.lld, llvm-ar, llvm-objdump (empty: use PATH)",
       "default": ""
+    },
+    {
+      "id": "crookImage",
+      "type": "promptString",
+      "description": "The raw CROOK image (.bin) to turn into ASSM text",
+      "default": "${workspaceFolder}/build-crook/tests/crook/crook_test.bin"
+    },
+    {
+      "id": "crookTitle",
+      "type": "promptString",
+      "description": "Title of the CROOK file (letters, digits, _)",
+      "default": "PROG"
     }
   ],
   "tasks": [
@@ -72,6 +84,18 @@
       "command": "ctest",
       "args": ["--test-dir", "${workspaceFolder}/build-crook", "--output-on-failure"],
       "dependsOn": "build (CROOK)",
+      "problemMatcher": []
+    },
+    {
+      "label": "image2assm (CROOK image to ASSM text)",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/tools/image2assm.py",
+        "${input:crookImage}",
+        "--title", "${input:crookTitle}",
+        "-o", "${input:crookImage}.asm"
+      ],
       "problemMatcher": []
     },
     {

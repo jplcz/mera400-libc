@@ -18,8 +18,11 @@
  * twice its size in words.
  *
  * All numbers in a linker script are BYTE addresses (a word is two bytes).
- * Parameters (change them with --defsym=NAME=VALUE after -T, e.g.
- * --defsym=__image_base=2048; no need to edit this file):
+ * Parameters (change them with --defsym=NAME=VALUE given BEFORE -T, e.g.
+ * --defsym=__image_base=2048; no need to edit this file. A --defsym after -T
+ * is too late: the PROVIDEd symbols that depend on it, such as __stack_top,
+ * would already have been computed from the defaults. The Clang driver's
+ * -mcrook-base=, -mcrook-image= and -mcrook-stack= (in words) do this:
  *   __image_base   BYTE address of the first word of the image (default 0,
  *                  the default base of CROOK's assembler). cmake/crook.cmake
  *                  passes 2 * MERA400_CROOK_BASE.
@@ -45,7 +48,7 @@
 
 ENTRY(_start)
 
-/* PROVIDE gives the defaults; a --defsym on the command line (given after
+/* PROVIDE gives the defaults; a --defsym on the command line (given BEFORE
    -T) replaces them. */
 PROVIDE(__image_base = 0);
 PROVIDE(__image_size = 0x4000);
