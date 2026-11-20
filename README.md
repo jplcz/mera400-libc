@@ -1,5 +1,7 @@
 # MERA-400 C library
 
+This project requires LLVM toolchain from https://github.com/jplcz/mera400-llvm
+
 A small C standard library for the MERA-400, a 16-bit Polish minicomputer
 from the 1970s. It is a work in progress: the core routines exist and are
 tested on a software simulator, but **nothing here has run on real hardware**.
