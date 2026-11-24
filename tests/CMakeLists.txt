@@ -94,6 +94,10 @@ if(MERA400_C_ENABLED)
                              LIBRARIES c builtins)
       add_test(NAME init-cpp COMMAND ${_py} ${SIM}/test_init.py init_cpp_test.elf
                                      ABmba 77 0 ${MERA400_MODEL})
+      mera400_add_executable(cxx_test SOURCES c/test_cxx.cpp
+                             LIBRARIES c builtins)
+      add_test(NAME cxx COMMAND ${_py} ${SIM}/test_init.py cxx_test.elf
+                                 abcdef 77 0 ${MERA400_MODEL})
     endif()
   endif()
 endif()

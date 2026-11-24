@@ -23,9 +23,9 @@ extern "C" {
    functions registered with atexit (last registered first), then the
    .fini_array (C++ static destructors), then _Exit, which stops the
    processor (hlt). */
-void exit(int status);
-void _Exit(int status);
-void abort(void);
+__attribute__((noreturn)) void exit(int status);
+__attribute__((noreturn)) void _Exit(int status);
+__attribute__((noreturn)) void abort(void);
 int atexit(void (*func)(void));
 
 int abs(int x);

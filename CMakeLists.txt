@@ -159,6 +159,11 @@ set(MERA400_C_SOURCES)
 if(MERA400_C_ENABLED)
   file(GLOB MERA400_C_SOURCES CONFIGURE_DEPENDS
        src/ctype/*.c src/stdlib/*.c src/string/*.c src/stdio/*.c src/math/*.c)
+  if(MERA400_CLANGXX)
+    # The C++ run-time (operator new, std::terminate, __cxa_*) needs clang++.
+    file(GLOB _cxx_sources CONFIGURE_DEPENDS src/cxx/*.cpp)
+    list(APPEND MERA400_C_SOURCES ${_cxx_sources})
+  endif()
   if(MERA400_PLATFORM STREQUAL "crook")
     # libcrook provides the console hooks, putchar, puts and getchar.
     list(FILTER MERA400_C_SOURCES EXCLUDE REGEX "src/stdio/(console|putchar)\\.c$")
