@@ -30,7 +30,7 @@ struct Square : Shape {
 
 // extern "C": the build passes -ffreestanding, and then Clang mangles main
 // while crt0 calls "main"
-extern "C" int main() {
+int main() {
   Shape *shapes[2] = {new Rectangle(3, 4), new Square(3)};
   int total = 0;
   for (Shape *s : shapes) {
