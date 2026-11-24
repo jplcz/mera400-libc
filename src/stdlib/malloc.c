@@ -42,6 +42,8 @@ void *malloc(size_t n) {
   block *b;
   if (!first)
     init();
+  if (n > (size_t)-1 - 3) /* rounding up would wrap around to a tiny size */
+    return NULL;
   n = (n + 3) & ~(size_t)3; /* two words: keeps every block word aligned */
   if (n == 0)
     n = 4;
