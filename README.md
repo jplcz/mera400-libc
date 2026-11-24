@@ -49,6 +49,7 @@ tested on a software simulator, but **nothing here has run on real hardware**.
 | `src/ctype`, `src/stdlib` | portable C: `isalpha`..., `abs labs atoi atol strtol strtoul rand srand qsort bsearch malloc calloc realloc free`, `errno`; assembly `exit atexit abort _Exit` |
 | `src/stdio` | `printf fprintf sprintf snprintf vprintf vsnprintf puts putchar fputs fputc sscanf` and friends (see `src/stdio/README.md`). All output goes through one weak hook, `__stdout_putc` |
 | `src/math` | `fabs sqrt floor ceil fmod ldexp frexp modf exp log pow sin cos tan atan` and more, in C on the native double (accuracy suits the 40-bit mantissa) |
+| `examples`   | demo programs (Fibonacci, printf, C++ with `new` and virtual functions); each is built as an `.elf` and a flat `.bin` memory image, see `examples/README.md` |
 | `src/cxx`    | the minimal C++ run-time (needs `clang++`): `operator new/delete` over `malloc` (a failed `new` ends the program, as there are no exceptions; the `nothrow` forms return null), `std::terminate`, `__cxa_pure_virtual`, `__cxa_guard_*`, and a stub `__cxa_atexit`. A C++ standard library such as libc++ expects these from the platform |
 | `include`    | freestanding headers: `stdint inttypes limits errno assert ctype string stdlib stdio math float time locale wchar wctype` (`stddef`, `stdarg` and `stdbool` come from Clang). `time`, `locale`, `wchar`, `wctype` and parts of `stdlib`/`stdio` only declare functions so that libc++ headers compile; they are not implemented. Every header that declares functions has `extern "C"` guards, so C++ code links to the C implementations |
 | `builtins`   | the helpers the compiler calls for operations the CPU lacks: 16-bit integer ones in assembly, 32/64-bit integer ones in C, and the `__m48_*` floating-point ones, in software (see `builtins/README.md`) |
@@ -122,11 +123,12 @@ Inside this project use the helpers from `cmake/Mera400.cmake`:
 
 ```cmake
 include(Mera400)
-mera400_add_executable(hello SOURCES hello.s LIBRARIES c builtins BINARY)
+mera400_add_executable(hello SOURCES hello.s LIBRARIES c builtins)
 ```
 
-This links `hello.elf` (and a flat memory image `hello.bin` because of
-`BINARY`) with crt0 first. By hand it is:
+This links `hello.elf` and also a flat memory image `hello.bin` (the bytes of
+the image without ELF headers, which is what an emulator loads) with crt0
+first. By hand it is:
 
 ```sh
 ld.lld -m mera400elf -T crt/mera400.ld crt0.o hello.o libc.a libbuiltins.a -o hello.elf

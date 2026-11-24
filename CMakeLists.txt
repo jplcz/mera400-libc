@@ -229,6 +229,11 @@ if(MERA400_PLATFORM STREQUAL "crook")
           DESTINATION lib)
 endif()
 
+# --- Examples ---------------------------------------------------------------
+if(MERA400_C_ENABLED)
+  add_subdirectory(examples)
+endif()
+
 # --- Tests ------------------------------------------------------------------
 include(CTest)
 if(BUILD_TESTING)

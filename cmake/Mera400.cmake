@@ -155,7 +155,7 @@ function(mera400_add_library name)
 endfunction()
 
 function(mera400_add_executable name)
-  cmake_parse_arguments(ARG "BINARY" "" "SOURCES;LIBRARIES;LINK_OPTIONS;COMPILE_OPTIONS" ${ARGN})
+  cmake_parse_arguments(ARG "" "" "SOURCES;LIBRARIES;LINK_OPTIONS;COMPILE_OPTIONS" ${ARGN})
   mera400_check_tools()
   set(MERA400_COMPILE_OPTIONS ${ARG_COMPILE_OPTIONS})
   set(_objs)
@@ -181,19 +181,19 @@ function(mera400_add_executable name)
     DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"
     COMMENT "Linking ${name}.elf"
     VERBATIM)
-  set(_outputs "${_elf}")
-  if(ARG_BINARY)
-    set(_bin "${CMAKE_CURRENT_BINARY_DIR}/${name}.bin")
-    add_custom_command(
-      OUTPUT "${_bin}"
-      COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
-              -T "${MERA400_LINKER_SCRIPT}" --gc-sections --oformat=binary
-              "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>" ${_objs} ${_libs}
-              -o "${_bin}"
-      DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"
-      COMMENT "Linking ${name}.bin"
-      VERBATIM)
-    list(APPEND _outputs "${_bin}")
-  endif()
+  # Every program also gets a flat binary: the bytes of the memory image from
+  # __image_base, with no ELF headers, which is what an emulator or a loader
+  # puts into memory (the ELF keeps the symbols for debugging).
+  set(_bin "${CMAKE_CURRENT_BINARY_DIR}/${name}.bin")
+  add_custom_command(
+    OUTPUT "${_bin}"
+    COMMAND "${MERA400_LD_LLD}" -m mera400elf ${MERA400_LINK_DEFSYMS} ${ARG_LINK_OPTIONS}
+            -T "${MERA400_LINKER_SCRIPT}" --gc-sections --oformat=binary
+            "$<TARGET_PROPERTY:crt0,MERA400_OBJECT>" ${_objs} ${_libs}
+            -o "${_bin}"
+    DEPENDS ${_objs} ${_libs} ${_deps} crt0 "${MERA400_LINKER_SCRIPT}"
+    COMMENT "Linking ${name}.bin"
+    VERBATIM)
+  set(_outputs "${_elf}" "${_bin}")
   add_custom_target(${name} ALL DEPENDS ${_outputs})
 endfunction()

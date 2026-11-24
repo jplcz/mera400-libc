@@ -11,7 +11,7 @@ set(SIM "${CMAKE_CURRENT_SOURCE_DIR}/sim")
 # A complete program: crt0 + main + libraries, linked by the library's own
 # helper (so crt0 is first and the linker script is used).
 mera400_add_executable(crt_test SOURCES crt/main_ret.s
-                       LIBRARIES c builtins BINARY)
+                       LIBRARIES c builtins)
 
 # Images for testing single libraries: every member of the archive is kept
 # (--whole-archive) and there is no crt0; the test calls functions directly.
