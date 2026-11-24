@@ -21,12 +21,27 @@
 
 #include <float.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* The largest finite value, 2^127 * (1 - 2^-39), which every overflowing
    result saturates to (DBL_MAX is a few thousand units in the last place
    smaller: it has only nine digits). */
 #define HUGE_VAL 1.7014118346015974672e+38
 #define HUGE_VALF HUGE_VAL
 #define INFINITY HUGE_VAL
+/* Classes returned by fpclassify (the format has no NaN, infinity or
+   subnormal numbers, so only FP_ZERO and FP_NORMAL occur). */
+#define FP_NAN 0
+#define FP_INFINITE 1
+#define FP_ZERO 2
+#define FP_SUBNORMAL 3
+#define FP_NORMAL 4
+
+typedef float float_t;
+typedef double double_t;
+
 #define isnan(x) ((void)(x), 0)
 #define isinf(x) ((void)(x), 0)
 #define isfinite(x) ((void)(x), 1)
@@ -90,5 +105,9 @@ double acos(double x);
 double sinh(double x);
 double cosh(double x);
 double tanh(double x);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

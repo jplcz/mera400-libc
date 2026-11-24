@@ -16,6 +16,10 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define EOF (-1)
 
 typedef struct __FILE FILE;
@@ -29,6 +33,12 @@ int vprintf(const char *fmt, va_list ap);
 int vfprintf(FILE *f, const char *fmt, va_list ap);
 int vsprintf(char *buf, const char *fmt, va_list ap);
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list ap);
+
+/* Declarations only; there is no file system, so these are not implemented.
+   libc++ <cstdio> needs remove to exist, otherwise its using-declaration
+   collides with std::remove from <algorithm>. */
+int remove(const char *path);
+int rename(const char *from, const char *to);
 
 int putchar(int c);
 int fputc(int c, FILE *f);
@@ -46,5 +56,9 @@ int sscanf(const char *s, const char *fmt, ...);
 /* The platform hooks (weak defaults in src/stdio/console.c). */
 int __stdout_putc(int c);
 int __stdin_getc(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

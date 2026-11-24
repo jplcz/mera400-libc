@@ -11,6 +11,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Implemented in assembly (the .s files in src/string). */
 void *memcpy(void *dest, const void *src, size_t n);
 void *memmove(void *dest, const void *src, size_t n);
@@ -33,5 +37,9 @@ size_t strspn(const char *s, const char *accept);
 size_t strcspn(const char *s, const char *reject);
 char *strpbrk(const char *s, const char *accept);
 char *strstr(const char *haystack, const char *needle);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

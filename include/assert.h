@@ -14,6 +14,9 @@
 #define assert(expr) ((void)0)
 #else
 /* There is no stdio yet, so a failed assertion just aborts (hlt 040). */
+#ifdef __cplusplus
+extern "C"
+#endif
 void __assert_fail(const char *expr, const char *file, int line);
 #define assert(expr) \
   ((expr) ? (void)0 : __assert_fail(#expr, __FILE__, __LINE__))
