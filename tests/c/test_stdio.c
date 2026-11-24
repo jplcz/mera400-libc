@@ -83,7 +83,7 @@ int main(void) {
   CHECK(n == 8 && strcmp(buf, "005:2.50") == 0);
 #else
   n = fmt_into(buf, sizeof buf, "%03d:%.2f:%d", 5, 2.5, 6);
-  CHECK(n == 14 && strcmp(buf, "005:?float?:6") == 0);
+  CHECK(n == 13 && strcmp(buf, "005:?float?:6") == 0);
 #endif
   CHECK(snprintf(0, 0, "%ld", 123456L) == 6);
 
