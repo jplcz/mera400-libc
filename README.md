@@ -342,9 +342,6 @@ Not guessed; each needs a source or a real CROOK:
   that `R5`, `R6`, `R7` are preserved. The simulator's instruction decoder
   is cross-checked against `llvm-objdump` for every instruction in the
   images.
-* **EM400** (the existing MERA-400 emulator) could not be built in the
-  development environment (missing dependencies), so the code has **not**
-  been run on it. Running these tests on EM400 is a good next step.
 * **Host compiler** for the portable C code: `tests/host/test_c.c` compiles
   `ctype`, `strtol`, `qsort`, `malloc` and the C string functions with the
   build computer's compiler. This checks the algorithms, not code generation
